@@ -36,8 +36,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { href: '/', icon: Home, label: 'Home' },
     { href: '/search', icon: Search, label: 'Search' },
     { href: '/orders', icon: ShoppingBag, label: 'My Orders' },
-    { href: '/favorites', icon: Heart, label: 'Favorites' },
-    { href: '/order-history', icon: Clock, label: 'Order History' },
+    { href: '/profile/favorites', icon: Heart, label: 'Favorites' },
     { href: '/offers', icon: Tag, label: 'Offers' },
     { href: '/help', icon: HelpCircle, label: 'Help & Support' },
   ];

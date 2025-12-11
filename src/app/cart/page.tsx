@@ -121,7 +121,7 @@ export default function CartPage() {
       </div>
 
       {/* Delivery Address */}
-      <Link href="/addresses">
+      <Link href="/profile/addresses">
         <Card className="mx-4 mt-4">
           <div className="flex items-center gap-3">
             <MapPin className="h-5 w-5 text-orange-500" />
