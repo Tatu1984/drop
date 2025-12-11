@@ -1,0 +1,20 @@
+{
+  "name": "Drop - Delivery App",
+  "short_name": "Drop",
+  "description": "Multi-platform delivery application for food, groceries, and more",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f97316",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["food", "shopping", "lifestyle"],
+  "prefer_related_applications": false
+}
