@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/orders/[orderId] - Get single order with items
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const { orderId } = params;
+    const { orderId } = await params;
 
     const order = await prisma.dineInOrder.findUnique({
       where: { id: orderId },
@@ -100,10 +101,10 @@ export async function GET(
 // PUT /api/rms/orders/[orderId] - Update order
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const { orderId } = params;
+    const { orderId } = await params;
     const body = await request.json();
     const {
       serverEmployeeId,
@@ -186,10 +187,10 @@ export async function PUT(
 // DELETE /api/rms/orders/[orderId] - Delete/void order
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
-    const { orderId } = params;
+    const { orderId } = await params;
 
     // Check if order exists
     const existingOrder = await prisma.dineInOrder.findUnique({

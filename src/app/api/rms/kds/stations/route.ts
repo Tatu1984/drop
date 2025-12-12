@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET /api/rms/kds/stations - Get all KDS stations for outlet
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const searchParams = request.nextUrl.searchParams;
     const outletId = searchParams.get('outletId');
 
@@ -59,6 +63,9 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/kds/stations - Create new KDS station
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       outletId,

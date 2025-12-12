@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/tables/[tableId] - Get a single table
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   try {
-    const { tableId } = params;
+    const { tableId } = await params;
 
     const table = await prisma.table.findUnique({
       where: { id: tableId },
@@ -67,10 +68,10 @@ export async function GET(
 // PUT /api/rms/tables/[tableId] - Update a table
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   try {
-    const { tableId } = params;
+    const { tableId } = await params;
     const body = await request.json();
 
     // Check if table exists
@@ -142,10 +143,10 @@ export async function PUT(
 // DELETE /api/rms/tables/[tableId] - Delete a table
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   try {
-    const { tableId } = params;
+    const { tableId } = await params;
 
     // Check if table exists
     const table = await prisma.table.findUnique({
@@ -186,10 +187,10 @@ export async function DELETE(
 // PATCH /api/rms/tables/[tableId] - Update table status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tableId: string }> }
 ) {
   try {
-    const { tableId } = params;
+    const { tableId } = await params;
     const body = await request.json();
     const { status } = body;
 

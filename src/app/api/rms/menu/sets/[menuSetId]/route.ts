@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/menu/sets/[menuSetId] - Get a specific menu set
 export async function GET(
   request: NextRequest,
-  { params }: { params: { menuSetId: string } }
+  { params }: { params: Promise<{ menuSetId: string }> }
 ) {
   try {
-    const { menuSetId } = params;
+    const { menuSetId } = await params;
 
     const menuSet = await prisma.menuSet.findUnique({
       where: { id: menuSetId },
@@ -51,10 +52,10 @@ export async function GET(
 // PUT /api/rms/menu/sets/[menuSetId] - Update a menu set
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { menuSetId: string } }
+  { params }: { params: Promise<{ menuSetId: string }> }
 ) {
   try {
-    const { menuSetId } = params;
+    const { menuSetId } = await params;
     const body = await request.json();
     const {
       name,
@@ -103,10 +104,10 @@ export async function PUT(
 // DELETE /api/rms/menu/sets/[menuSetId] - Delete a menu set
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { menuSetId: string } }
+  { params }: { params: Promise<{ menuSetId: string }> }
 ) {
   try {
-    const { menuSetId } = params;
+    const { menuSetId } = await params;
 
     const existingMenuSet = await prisma.menuSet.findUnique({
       where: { id: menuSetId },

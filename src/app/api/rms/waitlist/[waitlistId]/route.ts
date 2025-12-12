@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // PATCH /api/rms/waitlist/[waitlistId] - Update waitlist status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { waitlistId: string } }
+  { params }: { params: Promise<{ waitlistId: string }> }
 ) {
   try {
-    const { waitlistId } = params;
+    const { waitlistId } = await params;
     const body = await request.json();
     const { status, tableId, notes } = body;
 
@@ -113,10 +114,10 @@ export async function PATCH(
 // GET /api/rms/waitlist/[waitlistId] - Get a single waitlist entry
 export async function GET(
   request: NextRequest,
-  { params }: { params: { waitlistId: string } }
+  { params }: { params: Promise<{ waitlistId: string }> }
 ) {
   try {
-    const { waitlistId } = params;
+    const { waitlistId } = await params;
 
     const waitlistEntry = await prisma.waitlist.findUnique({
       where: { id: waitlistId },
@@ -159,10 +160,10 @@ export async function GET(
 // DELETE /api/rms/waitlist/[waitlistId] - Remove from waitlist
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { waitlistId: string } }
+  { params }: { params: Promise<{ waitlistId: string }> }
 ) {
   try {
-    const { waitlistId } = params;
+    const { waitlistId } = await params;
 
     // Check if entry exists
     const waitlistEntry = await prisma.waitlist.findUnique({

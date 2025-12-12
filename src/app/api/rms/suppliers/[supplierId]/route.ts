@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { supplierId: string } }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
-    const { supplierId } = params;
+    const { supplierId } = await params;
 
     const supplier = await prisma.supplier.findUnique({
       where: { id: supplierId },
@@ -59,10 +60,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { supplierId: string } }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
-    const { supplierId } = params;
+    const { supplierId } = await params;
     const body = await request.json();
 
     // Check if supplier exists
@@ -121,10 +122,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { supplierId: string } }
+  { params }: { params: Promise<{ supplierId: string }> }
 ) {
   try {
-    const { supplierId } = params;
+    const { supplierId } = await params;
 
     // Check if supplier exists
     const existingSupplier = await prisma.supplier.findUnique({

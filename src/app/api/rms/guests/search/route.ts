@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET - Search guest by phone or email for quick lookup
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const vendorId = searchParams.get('vendorId');
     const phone = searchParams.get('phone');

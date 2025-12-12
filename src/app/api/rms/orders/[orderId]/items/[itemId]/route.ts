@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // PUT /api/rms/orders/[orderId]/items/[itemId] - Update order item
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { orderId: string; itemId: string } }
+  { params }: { params: Promise<{ orderId: string; itemId: string }> }
 ) {
   try {
-    const { orderId, itemId } = params;
+    const { orderId, itemId } = await params;
     const body = await request.json();
     const {
       quantity,
@@ -109,10 +110,10 @@ export async function PUT(
 // DELETE /api/rms/orders/[orderId]/items/[itemId] - Remove/void order item
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { orderId: string; itemId: string } }
+  { params }: { params: Promise<{ orderId: string; itemId: string }> }
 ) {
   try {
-    const { orderId, itemId } = params;
+    const { orderId, itemId } = await params;
     const searchParams = request.nextUrl.searchParams;
     const voidReason = searchParams.get('voidReason') || 'Item removed';
     const voidByEmployeeId = searchParams.get('voidByEmployeeId');
@@ -184,10 +185,10 @@ export async function DELETE(
 // PATCH /api/rms/orders/[orderId]/items/[itemId] - Update item status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { orderId: string; itemId: string } }
+  { params }: { params: Promise<{ orderId: string; itemId: string }> }
 ) {
   try {
-    const { orderId, itemId } = params;
+    const { orderId, itemId } = await params;
     const body = await request.json();
     const { status } = body;
 

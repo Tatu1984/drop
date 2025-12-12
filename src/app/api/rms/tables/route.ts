@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
+import { requireRMSAuth } from '@/lib/rms-auth';
 
 // GET /api/rms/tables - Get all tables for an outlet
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const searchParams = request.nextUrl.searchParams;
     const outletId = searchParams.get('outletId');
     const floorId = searchParams.get('floorId');
@@ -70,6 +74,9 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/tables - Create a new table
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       outletId,

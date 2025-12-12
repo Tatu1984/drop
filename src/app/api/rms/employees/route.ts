@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const role = searchParams.get('role');
@@ -85,6 +89,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       vendorId,

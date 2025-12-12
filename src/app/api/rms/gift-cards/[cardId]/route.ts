@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET - Get gift card with transaction history
 export async function GET(
   request: NextRequest,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   try {
-    const { cardId } = params;
+    const { cardId } = await params;
     const { searchParams } = new URL(request.url);
     const cardNumber = searchParams.get('cardNumber');
 
@@ -56,10 +57,10 @@ export async function GET(
 // POST - Redeem gift card
 export async function POST(
   request: NextRequest,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   try {
-    const { cardId } = params;
+    const { cardId } = await params;
     const body = await request.json();
     const { amount, pin, orderId } = body;
 
@@ -134,10 +135,10 @@ export async function POST(
 // PATCH - Update gift card (reload balance, deactivate, etc.)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { cardId: string } }
+  { params }: { params: Promise<{ cardId: string }> }
 ) {
   try {
-    const { cardId } = params;
+    const { cardId } = await params;
     const body = await request.json();
     const { action, amount } = body;
 

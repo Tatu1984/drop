@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { shiftId: string } }
+  { params }: { params: Promise<{ shiftId: string }> }
 ) {
   try {
-    const { shiftId } = params;
+    const { shiftId } = await params;
 
     const shift = await prisma.shift.findUnique({
       where: { id: shiftId },
@@ -83,10 +84,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { shiftId: string } }
+  { params }: { params: Promise<{ shiftId: string }> }
 ) {
   try {
-    const { shiftId } = params;
+    const { shiftId } = await params;
     const body = await request.json();
     const {
       actualCash,

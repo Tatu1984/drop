@@ -79,7 +79,7 @@ export default function ReservationsPage() {
     switch (status) {
       case 'PENDING': return <Badge variant="warning">Pending</Badge>;
       case 'CONFIRMED': return <Badge variant="info">Confirmed</Badge>;
-      case 'SEATED': return <Badge variant="primary">Seated</Badge>;
+      case 'SEATED': return <Badge variant="info">Seated</Badge>;
       case 'COMPLETED': return <Badge variant="success">Completed</Badge>;
       case 'NO_SHOW': return <Badge variant="error">No Show</Badge>;
       case 'CANCELLED': return <Badge variant="default">Cancelled</Badge>;
@@ -333,7 +333,7 @@ export default function ReservationsPage() {
                           </Button>
                           {res.status === 'CONFIRMED' && (
                             <Button
-                              variant="primary"
+                              variant="secondary"
                               size="sm"
                               onClick={() => updateStatus(res.id, 'SEATED')}
                             >
@@ -356,7 +356,7 @@ export default function ReservationsPage() {
         isOpen={!!selectedReservation}
         onClose={() => setSelectedReservation(null)}
         title="Reservation Details"
-        maxWidth="md"
+        size="md"
       >
         {selectedReservation && (
           <div className="space-y-4">
@@ -462,7 +462,7 @@ export default function ReservationsPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         title="New Reservation"
-        maxWidth="lg"
+        size="lg"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

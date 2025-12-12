@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, serverErrorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/waste/[wasteId] - Get waste log details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { wasteId: string } }
+  { params }: { params: Promise<{ wasteId: string }> }
 ) {
   try {
-    const { wasteId } = params;
+    const { wasteId } = await params;
 
     if (!wasteId) {
       return errorResponse('Waste ID is required', 400);

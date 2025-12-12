@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { entryId: string } }
+  { params }: { params: Promise<{ entryId: string }> }
 ) {
   try {
-    const { entryId } = params;
+    const { entryId } = await params;
     const body = await request.json();
     const { action, breakStart, breakEnd } = body;
 
@@ -146,10 +147,10 @@ export async function PATCH(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { entryId: string } }
+  { params }: { params: Promise<{ entryId: string }> }
 ) {
   try {
-    const { entryId } = params;
+    const { entryId } = await params;
     const body = await request.json();
     const {
       clockIn,

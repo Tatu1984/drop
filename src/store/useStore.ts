@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type {
   User,
   Address,
@@ -72,7 +72,11 @@ export const useAuthStore = create<AuthState>()(
       logoutAdmin: () => set({ adminUser: null }),
       logoutRider: () => set({ riderUser: null }),
     }),
-    { name: 'auth-storage' }
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -108,7 +112,11 @@ export const useLocationStore = create<LocationState>()(
         })),
       setIsDetecting: (isDetecting) => set({ isDetecting }),
     }),
-    { name: 'location-storage' }
+    {
+      name: 'location-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -181,14 +189,18 @@ export const useCartStore = create<CartState>()(
           };
         }),
       updateQuantity: (itemId, quantity) =>
-        set((state) => ({
-          items:
-            quantity > 0
-              ? state.items.map((item) =>
-                  item.id === itemId ? { ...item, quantity } : item
-                )
-              : state.items.filter((item) => item.id !== itemId),
-        })),
+        set((state) => {
+          const newItems = quantity > 0
+            ? state.items.map((item) =>
+                item.id === itemId ? { ...item, quantity } : item
+              )
+            : state.items.filter((item) => item.id !== itemId);
+          return {
+            items: newItems,
+            vendorId: newItems.length > 0 ? state.vendorId : null,
+            vendor: newItems.length > 0 ? state.vendor : null,
+          };
+        }),
       clearCart: () => set({ items: [], vendorId: null, vendor: null }),
       setVendor: (vendor) => set({ vendor, vendorId: vendor?.id || null }),
       getSubtotal: () => {
@@ -203,7 +215,11 @@ export const useCartStore = create<CartState>()(
         return state.items.reduce((count, item) => count + item.quantity, 0);
       },
     }),
-    { name: 'cart-storage' }
+    {
+      name: 'cart-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -247,7 +263,11 @@ export const useOrderStore = create<OrderState>()(
         set((state) => ({ genieOrders: [order, ...state.genieOrders] })),
       setActiveGenieOrder: (activeGenieOrder) => set({ activeGenieOrder }),
     }),
-    { name: 'order-storage' }
+    {
+      name: 'order-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -280,7 +300,11 @@ export const usePartyStore = create<PartyState>()(
           activeParty: state.activeParty?.id === party.id ? party : state.activeParty,
         })),
     }),
-    { name: 'party-storage' }
+    {
+      name: 'party-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -311,7 +335,11 @@ export const useWalletStore = create<WalletState>()(
             : null,
         })),
     }),
-    { name: 'wallet-storage' }
+    {
+      name: 'wallet-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -355,7 +383,11 @@ export const useSearchStore = create<SearchState>()(
       clearRecentSearches: () => set({ recentSearches: [] }),
       setSuggestions: (suggestions) => set({ suggestions }),
     }),
-    { name: 'search-storage' }
+    {
+      name: 'search-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -403,7 +435,11 @@ export const useNotificationStore = create<NotificationState>()(
         })),
       clearNotifications: () => set({ notifications: [], unreadCount: 0 }),
     }),
-    { name: 'notification-storage' }
+    {
+      name: 'notification-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
 
@@ -450,6 +486,23 @@ export const useUIStore = create<UIState>()(
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
     }),
-    { name: 'ui-storage' }
+    {
+      name: 'ui-storage',
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
+    }
   )
 );
+
+// Hydrate stores on client side
+if (typeof window !== 'undefined') {
+  useAuthStore.persist.rehydrate();
+  useLocationStore.persist.rehydrate();
+  useCartStore.persist.rehydrate();
+  useOrderStore.persist.rehydrate();
+  usePartyStore.persist.rehydrate();
+  useWalletStore.persist.rehydrate();
+  useSearchStore.persist.rehydrate();
+  useNotificationStore.persist.rehydrate();
+  useUIStore.persist.rehydrate();
+}

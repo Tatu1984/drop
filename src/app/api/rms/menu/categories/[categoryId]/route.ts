@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/menu/categories/[categoryId] - Get a specific menu category
 export async function GET(
   request: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = params;
+    const { categoryId } = await params;
 
     const category = await prisma.menuCategory.findUnique({
       where: { id: categoryId },
@@ -70,10 +71,10 @@ export async function GET(
 // PUT /api/rms/menu/categories/[categoryId] - Update a menu category
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = params;
+    const { categoryId } = await params;
     const body = await request.json();
     const {
       name,
@@ -139,10 +140,10 @@ export async function PUT(
 // DELETE /api/rms/menu/categories/[categoryId] - Delete a menu category
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { categoryId: string } }
+  { params }: { params: Promise<{ categoryId: string }> }
 ) {
   try {
-    const { categoryId } = params;
+    const { categoryId } = await params;
 
     const existingCategory = await prisma.menuCategory.findUnique({
       where: { id: categoryId },

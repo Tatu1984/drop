@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, unauthorizedResponse } from '@/lib/api-response';
 import bcrypt from 'bcryptjs';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { employeeId: string } }
+  { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
-    const { employeeId } = params;
+    const { employeeId } = await params;
     const body = await request.json();
     const { pin } = body;
 

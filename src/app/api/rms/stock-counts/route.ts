@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
 
@@ -27,6 +28,9 @@ async function generateCountNumber(outletId: string): Promise<string> {
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const status = searchParams.get('status');
@@ -52,13 +56,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.startedAt = {};
+      const startedAtFilter: { gte?: Date; lte?: Date } = {};
       if (startDate) {
-        where.startedAt.gte = new Date(startDate);
+        startedAtFilter.gte = new Date(startDate);
       }
       if (endDate) {
-        where.startedAt.lte = new Date(endDate);
+        startedAtFilter.lte = new Date(endDate);
       }
+      where.startedAt = startedAtFilter;
     }
 
     // Get total count
@@ -101,6 +106,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const { outletId, type, employeeId, inventoryItemIds, categoryId, notes } = body;
 

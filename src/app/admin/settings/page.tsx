@@ -559,23 +559,31 @@ export default function AdminSettingsPage() {
                     { key: 'netBankingEnabled', name: 'Net Banking', icon: '🏦' },
                     { key: 'walletEnabled', name: 'Wallet', icon: '👛' },
                     { key: 'codEnabled', name: 'Cash on Delivery', icon: '💵' },
-                  ].map((method) => (
-                    <div key={method.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{method.icon}</span>
-                        <span className="font-medium">{method.name}</span>
+                  ].map((method) => {
+                    const isActive = payments[method.key as keyof typeof payments] as boolean;
+                    return (
+                      <div key={method.key} className={`flex items-center justify-between p-4 rounded-lg border-2 transition-colors ${isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-transparent'}`}>
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{method.icon}</span>
+                          <div>
+                            <span className="font-medium">{method.name}</span>
+                            {isActive && (
+                              <span className="ml-2 text-xs font-medium text-green-600 bg-green-100 px-2 py-0.5 rounded-full">Active</span>
+                            )}
+                          </div>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isActive}
+                            onChange={(e) => updateSetting('payments', method.key, e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                        </label>
                       </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={payments[method.key as keyof typeof payments] as boolean}
-                          onChange={(e) => updateSetting('payments', method.key, e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
-                      </label>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </Card>
 

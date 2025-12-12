@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
 
@@ -26,6 +27,9 @@ async function generatePONumber(vendorId: string): Promise<string> {
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const supplierId = searchParams.get('supplierId');
@@ -56,13 +60,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.orderDate = {};
+      const orderDateFilter: { gte?: Date; lte?: Date } = {};
       if (startDate) {
-        where.orderDate.gte = new Date(startDate);
+        orderDateFilter.gte = new Date(startDate);
       }
       if (endDate) {
-        where.orderDate.lte = new Date(endDate);
+        orderDateFilter.lte = new Date(endDate);
       }
+      where.orderDate = orderDateFilter;
     }
 
     // Get total count
@@ -116,6 +121,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       vendorId,

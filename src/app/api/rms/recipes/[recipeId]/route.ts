@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/recipes/[recipeId] - Get a specific recipe with all ingredients
 export async function GET(
   request: NextRequest,
-  { params }: { params: { recipeId: string } }
+  { params }: { params: Promise<{ recipeId: string }> }
 ) {
   try {
-    const { recipeId } = params;
+    const { recipeId } = await params;
 
     const recipe = await prisma.recipe.findUnique({
       where: { id: recipeId },
@@ -79,10 +80,10 @@ export async function GET(
 // PUT /api/rms/recipes/[recipeId] - Update a recipe
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { recipeId: string } }
+  { params }: { params: Promise<{ recipeId: string }> }
 ) {
   try {
-    const { recipeId } = params;
+    const { recipeId } = await params;
     const body = await request.json();
     const {
       name,
@@ -279,10 +280,10 @@ export async function PUT(
 // DELETE /api/rms/recipes/[recipeId] - Delete a recipe
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { recipeId: string } }
+  { params }: { params: Promise<{ recipeId: string }> }
 ) {
   try {
-    const { recipeId } = params;
+    const { recipeId } = await params;
 
     const existingRecipe = await prisma.recipe.findUnique({
       where: { id: recipeId },

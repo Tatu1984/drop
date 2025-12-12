@@ -89,8 +89,16 @@ export async function PUT(request: NextRequest) {
         },
       });
     } else if (type === 'wallet') {
-      // Top up wallet
-      const amount = parseInt(razorpayOrderId.split('_')[1]) || 0;
+      // Top up wallet - fetch actual amount from Razorpay for security
+      const Razorpay = require('razorpay');
+      const razorpay = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+      });
+
+      // Fetch order from Razorpay to get verified amount
+      const razorpayOrderDetails = await razorpay.orders.fetch(razorpayOrderId);
+      const verifiedAmount = razorpayOrderDetails.amount; // Amount in paise from Razorpay
 
       const wallet = await prisma.wallet.findUnique({
         where: { userId: user.userId },
@@ -100,16 +108,16 @@ export async function PUT(request: NextRequest) {
         await prisma.wallet.update({
           where: { id: wallet.id },
           data: {
-            balance: { increment: amount / 100 }, // Convert from paise
+            balance: { increment: verifiedAmount / 100 }, // Convert from paise
           },
         });
 
         await prisma.walletTransaction.create({
           data: {
             walletId: wallet.id,
-            amount: amount / 100,
+            amount: verifiedAmount / 100,
             type: 'TOP_UP',
-            description: `Wallet top-up via Razorpay`,
+            description: `Wallet top-up via Razorpay (Payment: ${razorpayPaymentId})`,
           },
         });
       }

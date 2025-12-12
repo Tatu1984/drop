@@ -1,9 +1,13 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const inventoryItemId = searchParams.get('inventoryItemId');
     const type = searchParams.get('type');
@@ -25,13 +29,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate || endDate) {
-      where.createdAt = {};
+      const createdAtFilter: { gte?: Date; lte?: Date } = {};
       if (startDate) {
-        where.createdAt.gte = new Date(startDate);
+        createdAtFilter.gte = new Date(startDate);
       }
       if (endDate) {
-        where.createdAt.lte = new Date(endDate);
+        createdAtFilter.lte = new Date(endDate);
       }
+      where.createdAt = createdAtFilter;
     }
 
     // If filtering by outlet, we need to join through inventoryItem
@@ -86,6 +91,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const { inventoryItemId, quantity, reason, employeeId, referenceType, referenceId } = body;
 

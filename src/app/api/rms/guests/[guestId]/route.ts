@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET - Get guest profile with full visit history
 export async function GET(
   request: NextRequest,
-  { params }: { params: { guestId: string } }
+  { params }: { params: Promise<{ guestId: string }> }
 ) {
   try {
-    const { guestId } = params;
+    const { guestId } = await params;
 
     const guest = await prisma.guestProfile.findUnique({
       where: { id: guestId },
@@ -104,10 +105,10 @@ export async function GET(
 // PUT - Update guest profile
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { guestId: string } }
+  { params }: { params: Promise<{ guestId: string }> }
 ) {
   try {
-    const { guestId } = params;
+    const { guestId } = await params;
     const body = await request.json();
 
     const {
@@ -196,10 +197,10 @@ export async function PUT(
 // DELETE - Delete guest profile
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { guestId: string } }
+  { params }: { params: Promise<{ guestId: string }> }
 ) {
   try {
-    const { guestId } = params;
+    const { guestId } = await params;
 
     // Check if guest exists
     const guest = await prisma.guestProfile.findUnique({

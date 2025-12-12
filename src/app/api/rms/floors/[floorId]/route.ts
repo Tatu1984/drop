@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/floors/[floorId] - Get a single floor
 export async function GET(
   request: NextRequest,
-  { params }: { params: { floorId: string } }
+  { params }: { params: Promise<{ floorId: string }> }
 ) {
   try {
-    const { floorId } = params;
+    const { floorId } = await params;
 
     const floor = await prisma.floor.findUnique({
       where: { id: floorId },
@@ -67,10 +68,10 @@ export async function GET(
 // PUT /api/rms/floors/[floorId] - Update a floor
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { floorId: string } }
+  { params }: { params: Promise<{ floorId: string }> }
 ) {
   try {
-    const { floorId } = params;
+    const { floorId } = await params;
     const body = await request.json();
 
     // Check if floor exists
@@ -109,10 +110,10 @@ export async function PUT(
 // DELETE /api/rms/floors/[floorId] - Delete a floor
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { floorId: string } }
+  { params }: { params: Promise<{ floorId: string }> }
 ) {
   try {
-    const { floorId } = params;
+    const { floorId } = await params;
 
     // Check if floor exists
     const floor = await prisma.floor.findUnique({

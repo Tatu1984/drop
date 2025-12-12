@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, serverErrorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
+import { requireRMSAuth } from '@/lib/rms-auth';
 
 // GET /api/rms/menu/items - Get all menu items
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     const isActive = searchParams.get('isActive');
@@ -92,6 +96,9 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/menu/items - Create a new menu item
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       categoryId,

@@ -292,7 +292,7 @@ export default function RMSLayout({
                           </>
                         )}
                       </button>
-                      {isSidebarOpen && isExpanded && (
+                      {isSidebarOpen && isExpanded && item.children && (
                         <ul className="mt-1 ml-4 pl-4 border-l border-gray-700 space-y-1">
                           {item.children.map(child => (
                             <li key={child.href}>

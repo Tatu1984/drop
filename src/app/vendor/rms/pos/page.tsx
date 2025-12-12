@@ -468,7 +468,7 @@ export default function POSPage() {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         title="Process Payment"
-        maxWidth="md"
+        size="md"
       >
         <div className="space-y-4">
           <div className="bg-gray-50 rounded-lg p-4 text-center">
@@ -511,7 +511,7 @@ export default function POSPage() {
         isOpen={showDiscountModal}
         onClose={() => setShowDiscountModal(false)}
         title="Apply Discount"
-        maxWidth="sm"
+        size="sm"
       >
         <div className="space-y-4">
           <div>

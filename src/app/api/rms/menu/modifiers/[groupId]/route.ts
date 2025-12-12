@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/menu/modifiers/[groupId] - Get a specific modifier group with all modifiers
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = params;
+    const { groupId } = await params;
 
     const modifierGroup = await prisma.modifierGroup.findUnique({
       where: { id: groupId },
@@ -50,10 +51,10 @@ export async function GET(
 // PUT /api/rms/menu/modifiers/[groupId] - Update a modifier group and its modifiers
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = params;
+    const { groupId } = await params;
     const body = await request.json();
     const {
       name,
@@ -157,10 +158,10 @@ export async function PUT(
 // DELETE /api/rms/menu/modifiers/[groupId] - Delete a modifier group
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const { groupId } = params;
+    const { groupId } = await params;
 
     const existingGroup = await prisma.modifierGroup.findUnique({
       where: { id: groupId },

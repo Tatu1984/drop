@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 import bcrypt from 'bcryptjs';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { employeeId: string } }
+  { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
-    const { employeeId } = params;
+    const { employeeId } = await params;
 
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
@@ -60,10 +61,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { employeeId: string } }
+  { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
-    const { employeeId } = params;
+    const { employeeId } = await params;
     const body = await request.json();
     const {
       firstName,
@@ -146,10 +147,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { employeeId: string } }
+  { params }: { params: Promise<{ employeeId: string }> }
 ) {
   try {
-    const { employeeId } = params;
+    const { employeeId } = await params;
 
     // Check if employee exists
     const employee = await prisma.employee.findUnique({

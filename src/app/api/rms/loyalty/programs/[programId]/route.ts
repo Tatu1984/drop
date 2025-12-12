@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET - Get loyalty program with tiers and rewards
 export async function GET(
   request: NextRequest,
-  { params }: { params: { programId: string } }
+  { params }: { params: Promise<{ programId: string }> }
 ) {
   try {
-    const { programId } = params;
+    const { programId } = await params;
 
     const program = await prisma.loyaltyProgram.findUnique({
       where: { id: programId },
@@ -36,10 +37,10 @@ export async function GET(
 // PUT - Update loyalty program
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { programId: string } }
+  { params }: { params: Promise<{ programId: string }> }
 ) {
   try {
-    const { programId } = params;
+    const { programId } = await params;
     const body = await request.json();
     const {
       name,

@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/analytics/trends - Get sales trends over time
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const period = searchParams.get('period') || 'week'; // week, month, quarter, year

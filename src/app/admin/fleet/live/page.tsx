@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
+import type { LiveMapRider, LiveMapZone, LiveMapUnassignedOrder } from './LiveMap';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const LiveMap = dynamic(() => import('./LiveMap'), {
@@ -20,60 +21,10 @@ const LiveMap = dynamic(() => import('./LiveMap'), {
   ),
 });
 
-interface ActiveOrder {
-  id: string;
-  orderNumber: string;
-  status: string;
-  pickup: {
-    name: string;
-    lat: number;
-    lng: number;
-  };
-  dropoff: {
-    address: string;
-    lat: number;
-    lng: number;
-  };
-}
-
-interface Rider {
-  id: string;
-  name: string;
-  phone: string;
-  avatar: string | null;
-  vehicle: string;
-  vehicleNumber: string;
-  status: 'online' | 'busy' | 'offline';
-  lat: number;
-  lng: number;
-  zone: string | null;
-  rating: number;
-  totalDeliveries: number;
-  activeOrder: ActiveOrder | null;
-}
-
-interface Zone {
-  id: string;
-  name: string;
-  polygon: unknown;
-  deliveryFee: number;
-}
-
-interface UnassignedOrder {
-  id: string;
-  orderNumber: string;
-  status: string;
-  vendor: {
-    name: string;
-    lat: number;
-    lng: number;
-  };
-  dropoff: {
-    address: string;
-    lat: number;
-    lng: number;
-  };
-}
+// Use the same types as LiveMap for consistency
+type Rider = LiveMapRider;
+type Zone = LiveMapZone;
+type UnassignedOrder = LiveMapUnassignedOrder;
 
 interface FleetData {
   riders: Rider[];

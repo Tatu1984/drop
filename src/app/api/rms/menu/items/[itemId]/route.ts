@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/menu/items/[itemId] - Get a specific menu item
 export async function GET(
   request: NextRequest,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = params;
+    const { itemId } = await params;
 
     const item = await prisma.menuItem.findUnique({
       where: { id: itemId },
@@ -69,10 +70,10 @@ export async function GET(
 // PUT /api/rms/menu/items/[itemId] - Update a menu item
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = params;
+    const { itemId } = await params;
     const body = await request.json();
     const {
       categoryId,
@@ -204,10 +205,10 @@ export async function PUT(
 // DELETE /api/rms/menu/items/[itemId] - Delete a menu item
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = params;
+    const { itemId } = await params;
 
     const existingItem = await prisma.menuItem.findUnique({
       where: { id: itemId },
@@ -247,10 +248,10 @@ export async function DELETE(
 // PATCH /api/rms/menu/items/[itemId] - Patch menu item availability (86 item)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { itemId: string } }
+  { params }: { params: Promise<{ itemId: string }> }
 ) {
   try {
-    const { itemId } = params;
+    const { itemId } = await params;
     const body = await request.json();
     const { isAvailable } = body;
 

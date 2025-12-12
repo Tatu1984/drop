@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { scheduleId: string } }
+  { params }: { params: Promise<{ scheduleId: string }> }
 ) {
   try {
-    const { scheduleId } = params;
+    const { scheduleId } = await params;
     const body = await request.json();
     const {
       date,
@@ -106,10 +107,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { scheduleId: string } }
+  { params }: { params: Promise<{ scheduleId: string }> }
 ) {
   try {
-    const { scheduleId } = params;
+    const { scheduleId } = await params;
 
     // Check if schedule exists
     const schedule = await prisma.employeeSchedule.findUnique({

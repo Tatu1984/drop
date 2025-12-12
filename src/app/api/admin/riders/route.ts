@@ -132,16 +132,11 @@ export async function POST(request: NextRequest) {
         return errorResponse('A rider with this phone number already exists', 400);
       }
 
-      // Hash default password (phone number)
-      const bcrypt = await import('bcryptjs');
-      const hashedPassword = await bcrypt.hash(phone, 10);
-
       const newRider = await prisma.rider.create({
         data: {
           name,
           phone,
           email: email || null,
-          password: hashedPassword,
           vehicleType: vehicleType || 'BIKE',
           vehicleNumber: vehicleNumber || null,
           assignedZone: assignedZone || null,

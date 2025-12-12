@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -8,6 +8,7 @@ import {
   Clock,
   TrendingUp,
   Mic,
+  MicOff,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useSearchStore } from '@/store/useStore';
@@ -16,6 +17,7 @@ import ProductCard from '@/components/cards/ProductCard';
 import VendorCard from '@/components/cards/VendorCard';
 import Input from '@/components/ui/Input';
 import Tabs from '@/components/ui/Tabs';
+import toast from 'react-hot-toast';
 
 const trendingSearches = [
   'Biryani',
@@ -43,6 +45,49 @@ export default function SearchPage() {
     products: typeof allProducts;
     vendors: typeof allVendors;
   }>({ products: [], vendors: [] });
+  const [isListening, setIsListening] = useState(false);
+
+  // Voice search handler
+  const handleVoiceSearch = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast.error('Voice search not supported in this browser');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      toast('Listening...', { icon: '🎤' });
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setQuery(transcript);
+      addRecentSearch(transcript);
+      toast.success(`Searching for "${transcript}"`);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        toast.error('Microphone access denied');
+      } else {
+        toast.error('Voice search failed. Try again.');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  }, [setQuery, addRecentSearch]);
 
   // Search effect
   useEffect(() => {
@@ -90,8 +135,11 @@ export default function SearchPage() {
                     <X className="h-5 w-5" />
                   </button>
                 ) : (
-                  <button className="text-orange-500">
-                    <Mic className="h-5 w-5" />
+                  <button
+                    onClick={handleVoiceSearch}
+                    className={`${isListening ? 'text-red-500 animate-pulse' : 'text-orange-500'}`}
+                  >
+                    {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                   </button>
                 )
               }

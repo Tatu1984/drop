@@ -3,7 +3,15 @@ import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import prisma from './prisma';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required. Please set it in your .env file.');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || '7d') as SignOptions['expiresIn'];
 
 export interface JWTPayload {

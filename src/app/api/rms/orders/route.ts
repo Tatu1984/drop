@@ -1,10 +1,17 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
+import { requireRMSAuth } from '@/lib/rms-auth';
 
 // GET /api/rms/orders - Get dine-in orders with filtering
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate vendor/admin
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) {
+      return authResult.response;
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const outletId = searchParams.get('outletId');
     const tableId = searchParams.get('tableId');
@@ -83,6 +90,12 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/orders - Create new dine-in order
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate vendor/admin
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) {
+      return authResult.response;
+    }
+
     const body = await request.json();
     const {
       outletId,

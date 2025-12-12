@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/outlets/[outletId] - Get a single outlet
 export async function GET(
   request: NextRequest,
-  { params }: { params: { outletId: string } }
+  { params }: { params: Promise<{ outletId: string }> }
 ) {
   try {
-    const { outletId } = params;
+    const { outletId } = await params;
 
     const outlet = await prisma.outlet.findUnique({
       where: { id: outletId },
@@ -55,10 +56,10 @@ export async function GET(
 // PUT /api/rms/outlets/[outletId] - Update an outlet
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { outletId: string } }
+  { params }: { params: Promise<{ outletId: string }> }
 ) {
   try {
-    const { outletId } = params;
+    const { outletId } = await params;
     const body = await request.json();
 
     // Check if outlet exists
@@ -121,10 +122,10 @@ export async function PUT(
 // DELETE /api/rms/outlets/[outletId] - Delete an outlet
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { outletId: string } }
+  { params }: { params: Promise<{ outletId: string }> }
 ) {
   try {
-    const { outletId } = params;
+    const { outletId } = await params;
 
     // Check if outlet exists
     const outlet = await prisma.outlet.findUnique({

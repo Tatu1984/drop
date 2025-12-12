@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
@@ -26,10 +27,10 @@ async function generateGRNNumber(): Promise<string> {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { poId: string } }
+  { params }: { params: Promise<{ poId: string }> }
 ) {
   try {
-    const { poId } = params;
+    const { poId } = await params;
     const body = await request.json();
     const { receivedByEmployeeId, items, notes } = body;
 
@@ -106,7 +107,12 @@ export async function POST(
           receivedDate: new Date(),
           notes: notes || null,
           items: {
-            create: receiptItems.map(item => ({
+            create: receiptItems.map((item: {
+              purchaseOrderItemId: string;
+              quantityReceived: number;
+              batchNumber: string | null;
+              expiryDate: Date | null;
+            }) => ({
               purchaseOrderItemId: item.purchaseOrderItemId,
               quantityReceived: item.quantityReceived,
               batchNumber: item.batchNumber,

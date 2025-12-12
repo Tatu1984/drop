@@ -1,34 +1,41 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-interface Rider {
+export interface LiveMapActiveOrder {
+  id: string;
+  orderNumber: string;
+  status: string;
+  pickup: { name: string; lat: number; lng: number };
+  dropoff: { address: string; lat: number; lng: number };
+}
+
+export interface LiveMapRider {
   id: string;
   name: string;
   phone: string;
+  avatar?: string | null;
   status: 'online' | 'busy' | 'offline';
   lat: number;
   lng: number;
   vehicle: string;
-  activeOrder: {
-    id: string;
-    orderNumber: string;
-    status: string;
-    pickup: { name: string; lat: number; lng: number };
-    dropoff: { address: string; lat: number; lng: number };
-  } | null;
+  vehicleNumber?: string;
+  zone?: string | null;
+  rating?: number;
+  totalDeliveries?: number;
+  activeOrder: LiveMapActiveOrder | null;
 }
 
-interface Zone {
+export interface LiveMapZone {
   id: string;
   name: string;
   polygon: unknown;
   deliveryFee: number;
 }
 
-interface UnassignedOrder {
+export interface LiveMapUnassignedOrder {
   id: string;
   orderNumber: string;
   status: string;
@@ -36,11 +43,11 @@ interface UnassignedOrder {
   dropoff: { address: string; lat: number; lng: number };
 }
 
-interface LiveMapProps {
-  riders: Rider[];
-  zones: Zone[];
-  unassignedOrders: UnassignedOrder[];
-  onRiderClick: (rider: Rider) => void;
+export interface LiveMapProps {
+  riders: LiveMapRider[];
+  zones: LiveMapZone[];
+  unassignedOrders: LiveMapUnassignedOrder[];
+  onRiderClick: (rider: LiveMapRider) => void;
 }
 
 // Create custom marker icons
@@ -149,7 +156,7 @@ const dropoffIcon = L.divIcon({
   popupAnchor: [0, -12],
 });
 
-export default function LiveMap({ riders, zones, unassignedOrders, onRiderClick }: LiveMapProps) {
+export default function LiveMap({ riders, zones, unassignedOrders, onRiderClick }: LiveMapProps): React.ReactElement {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);

@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
 // GET - Get specific feedback
 export async function GET(
   request: NextRequest,
-  { params }: { params: { feedbackId: string } }
+  { params }: { params: Promise<{ feedbackId: string }> }
 ) {
   try {
-    const { feedbackId } = params;
+    const { feedbackId } = await params;
 
     const feedback = await prisma.guestFeedback.findUnique({
       where: { id: feedbackId },
@@ -42,10 +43,10 @@ export async function GET(
 // PATCH - Respond to feedback
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { feedbackId: string } }
+  { params }: { params: Promise<{ feedbackId: string }> }
 ) {
   try {
-    const { feedbackId } = params;
+    const { feedbackId } = await params;
     const body = await request.json();
     const { response, respondedByEmployeeId } = body;
 

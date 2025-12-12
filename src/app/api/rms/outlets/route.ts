@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, getPaginationParams, paginatedResponse } from '@/lib/api-response';
 
 // GET /api/rms/outlets - Get all outlets for a vendor
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const searchParams = request.nextUrl.searchParams;
     const vendorId = searchParams.get('vendorId') || 'vendor-1';
     const { page, limit, skip } = getPaginationParams(searchParams);
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/outlets - Create a new outlet
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const {
       vendorId = 'vendor-1',

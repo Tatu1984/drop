@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // PATCH /api/rms/kds/tickets/[ticketId] - Update ticket status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { ticketId: string } }
+  { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
-    const { ticketId } = params;
+    const { ticketId } = await params;
     const body = await request.json();
     const { status, itemStatuses } = body;
 

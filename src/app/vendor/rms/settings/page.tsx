@@ -20,7 +20,6 @@ import {
   Mail,
   Save,
   ChevronRight,
-  Toggle,
   Wifi,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';

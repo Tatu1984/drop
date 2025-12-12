@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 // GET /api/rms/reservations/[reservationId] - Get a single reservation
 export async function GET(
   request: NextRequest,
-  { params }: { params: { reservationId: string } }
+  { params }: { params: Promise<{ reservationId: string }> }
 ) {
   try {
-    const { reservationId } = params;
+    const { reservationId } = await params;
 
     const reservation = await prisma.reservation.findUnique({
       where: { id: reservationId },
@@ -65,10 +66,10 @@ export async function GET(
 // PUT /api/rms/reservations/[reservationId] - Update a reservation
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { reservationId: string } }
+  { params }: { params: Promise<{ reservationId: string }> }
 ) {
   try {
-    const { reservationId } = params;
+    const { reservationId } = await params;
     const body = await request.json();
 
     // Check if reservation exists
@@ -156,10 +157,10 @@ export async function PUT(
 // DELETE /api/rms/reservations/[reservationId] - Delete a reservation
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { reservationId: string } }
+  { params }: { params: Promise<{ reservationId: string }> }
 ) {
   try {
-    const { reservationId } = params;
+    const { reservationId } = await params;
 
     // Check if reservation exists
     const reservation = await prisma.reservation.findUnique({
@@ -192,10 +193,10 @@ export async function DELETE(
 // PATCH /api/rms/reservations/[reservationId] - Update reservation status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { reservationId: string } }
+  { params }: { params: Promise<{ reservationId: string }> }
 ) {
   try {
-    const { reservationId } = params;
+    const { reservationId } = await params;
     const body = await request.json();
     const { status, cancelReason } = body;
 

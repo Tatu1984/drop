@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/printers - Get all printers for an outlet
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const type = searchParams.get('type'); // RECEIPT, KITCHEN, BAR, LABEL
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest) {
 // POST /api/rms/printers - Add a new printer
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const { outletId, name, type, connectionType, ipAddress, port, isActive } = body;
 
@@ -107,8 +114,11 @@ export async function POST(request: NextRequest) {
 }
 
 // PUT /api/rms/printers - Update a printer
-export async function PUT(request: NextRequest) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ [key: string]: string }> }) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const body = await request.json();
     const { id, name, type, connectionType, ipAddress, port, isActive } = body;
 
@@ -178,8 +188,11 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE /api/rms/printers - Delete a printer
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ [key: string]: string }> }) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

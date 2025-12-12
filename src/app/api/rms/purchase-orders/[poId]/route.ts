@@ -1,13 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { poId: string } }
+  { params }: { params: Promise<{ poId: string }> }
 ) {
   try {
-    const { poId } = params;
+    const { poId } = await params;
 
     const purchaseOrder = await prisma.purchaseOrder.findUnique({
       where: { id: poId },
@@ -80,10 +81,10 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { poId: string } }
+  { params }: { params: Promise<{ poId: string }> }
 ) {
   try {
-    const { poId } = params;
+    const { poId } = await params;
     const body = await request.json();
 
     // Check if PO exists
@@ -193,10 +194,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { poId: string } }
+  { params }: { params: Promise<{ poId: string }> }
 ) {
   try {
-    const { poId } = params;
+    const { poId } = await params;
 
     // Check if PO exists
     const existingPO = await prisma.purchaseOrder.findUnique({
@@ -234,10 +235,10 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { poId: string } }
+  { params }: { params: Promise<{ poId: string }> }
 ) {
   try {
-    const { poId } = params;
+    const { poId } = await params;
     const body = await request.json();
     const { status, employeeId } = body;
 

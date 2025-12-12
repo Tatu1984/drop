@@ -372,7 +372,7 @@ export default function TablesPage() {
           setSelectedTable(null);
         }}
         title={`Update ${selectedTable?.tableNumber || 'Table'}`}
-        maxWidth="sm"
+        size="sm"
       >
         {selectedTable && (
           <div className="space-y-4">
@@ -412,7 +412,7 @@ export default function TablesPage() {
         isOpen={showTableModal}
         onClose={() => setShowTableModal(false)}
         title="Add New Table"
-        maxWidth="md"
+        size="md"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">

@@ -1,10 +1,14 @@
 import { NextRequest } from 'next/server';
+import { requireRMSAuth } from '@/lib/rms-auth';
 import prisma from '@/lib/prisma';
 import { successResponse, errorResponse, serverErrorResponse } from '@/lib/api-response';
 
 // GET /api/rms/reports/inventory - Get inventory valuation and waste report
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireRMSAuth(request);
+    if (!authResult.authorized) return authResult.response;
+
     const { searchParams } = new URL(request.url);
     const outletId = searchParams.get('outletId');
     const reportType = searchParams.get('type') || 'valuation'; // valuation, waste, movement
