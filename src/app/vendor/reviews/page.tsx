@@ -146,7 +146,7 @@ export default function VendorReviewsPage() {
 
   const handleReply = (reviewId: string) => {
     if (replyText.trim()) {
-      console.log('Replying to review:', reviewId, 'with:', replyText);
+      // TODO: Implement API call to save reply
       setReplyingTo(null);
       setReplyText('');
     }
