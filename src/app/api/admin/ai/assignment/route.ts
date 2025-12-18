@@ -3,13 +3,23 @@ import prisma from '@/lib/prisma';
 import { getAdminUser, adminUnauthorizedResponse } from '@/lib/admin-auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
+interface OrderWithRider {
+  id: string;
+  orderNumber: string;
+  createdAt: Date;
+  status: string;
+  riderId: string | null;
+  rider: { name: string } | null;
+  vendor: { name: string };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { admin, error } = await getAdminUser(request);
     if (!admin) return adminUnauthorizedResponse(error);
 
     // Get recent orders with rider assignments
-    const orders = await prisma.order.findMany({
+    const orders: OrderWithRider[] = await prisma.order.findMany({
       take: 30,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -29,7 +39,8 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate assignment stats
-    const totalAssignments = orders.filter((o: typeof orders[number]) => o.riderId).length;
+    const ordersWithRider = orders.filter((o) => o.riderId);
+    const totalAssignments = ordersWithRider.length;
     const stats = {
       totalAssignments,
       autoAssigned: Math.floor(totalAssignments * 0.75),
@@ -51,8 +62,7 @@ export async function GET(request: NextRequest) {
 
     // Recent assignments
     const assignmentStatuses = ['assigned', 'accepted', 'rejected', 'timeout'] as const;
-    const recentAssignments = orders
-      .filter((o: typeof orders[number]) => o.riderId)
+    const recentAssignments = ordersWithRider
       .slice(0, 15)
       .map((order, index) => ({
         id: `assign-${order.id}`,
