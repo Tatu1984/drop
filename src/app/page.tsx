@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronRight, Sparkles, PartyPopper, Package, Loader2 } from 'lucide-react';
+import { ChevronRight, Sparkles, PartyPopper, Package, Loader2, Shield } from 'lucide-react';
 import { mainCategories, banners } from '@/data/mockData';
 import VendorCard from '@/components/cards/VendorCard';
 import ProductCard from '@/components/cards/ProductCard';
@@ -81,7 +81,18 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="pb-4">
+    <div className="pb-4 relative">
+      {/* Admin Link - Top Right */}
+      <div className="fixed top-2 right-2 z-50">
+        <Link
+          href="/admin/login"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900/80 text-white text-xs font-medium rounded-full hover:bg-gray-900 transition-colors"
+        >
+          <Shield className="h-3.5 w-3.5" />
+          Admin
+        </Link>
+      </div>
+
       {/* Banner Carousel */}
       <div className="relative h-40 overflow-hidden">
         {banners.map((banner, index) => (
