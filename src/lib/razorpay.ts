@@ -1,11 +1,22 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// Initialize Razorpay instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || '',
-});
+// Lazy-load Razorpay instance to avoid build-time errors
+let razorpayInstance: Razorpay | null = null;
+
+function getRazorpay(): Razorpay {
+  if (!razorpayInstance) {
+    const key_id = process.env.RAZORPAY_KEY_ID;
+    const key_secret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!key_id || !key_secret) {
+      throw new Error('Razorpay credentials not configured');
+    }
+
+    razorpayInstance = new Razorpay({ key_id, key_secret });
+  }
+  return razorpayInstance;
+}
 
 export interface CreateOrderParams {
   amount: number; // Amount in paise (INR * 100)
@@ -27,7 +38,7 @@ export interface PaymentOrder {
 export async function createRazorpayOrder(params: CreateOrderParams): Promise<PaymentOrder> {
   const { amount, currency = 'INR', receipt, notes = {} } = params;
 
-  const order = await razorpay.orders.create({
+  const order = await getRazorpay().orders.create({
     amount: Math.round(amount * 100), // Convert to paise
     currency,
     receipt,
@@ -68,7 +79,7 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
 
 // Fetch payment details
 export async function fetchPayment(paymentId: string) {
-  return razorpay.payments.fetch(paymentId);
+  return getRazorpay().payments.fetch(paymentId);
 }
 
 // Initiate refund
@@ -87,7 +98,7 @@ export async function initiateRefund(
     refundParams.notes = notes;
   }
 
-  return razorpay.payments.refund(paymentId, refundParams);
+  return getRazorpay().payments.refund(paymentId, refundParams);
 }
 
 // Create a customer
@@ -96,11 +107,11 @@ export async function createCustomer(
   email?: string,
   phone?: string
 ) {
-  return razorpay.customers.create({
+  return getRazorpay().customers.create({
     name,
     email,
     contact: phone,
   });
 }
 
-export default razorpay;
+export default { getRazorpay };

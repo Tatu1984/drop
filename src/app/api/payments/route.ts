@@ -90,14 +90,10 @@ export async function PUT(request: NextRequest) {
       });
     } else if (type === 'wallet') {
       // Top up wallet - fetch actual amount from Razorpay for security
-      const Razorpay = require('razorpay');
-      const razorpay = new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-      });
+      const { fetchPayment } = await import('@/lib/razorpay');
 
-      // Fetch order from Razorpay to get verified amount
-      const razorpayOrderDetails = await razorpay.orders.fetch(razorpayOrderId);
+      // Fetch payment from Razorpay to get verified amount
+      const razorpayOrderDetails = await fetchPayment(razorpayPaymentId);
       const verifiedAmount = razorpayOrderDetails.amount; // Amount in paise from Razorpay
 
       const wallet = await prisma.wallet.findUnique({
