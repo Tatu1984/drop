@@ -73,6 +73,7 @@ export default function RMSDashboardPage() {
   const [topItems, setTopItems] = useState<TopItem[]>([]);
   const [hourlySales, setHourlySales] = useState<{ hour: string; sales: number }[]>([]);
   const [salesGrowth, setSalesGrowth] = useState(0);
+  const [kitchenAlerts, setKitchenAlerts] = useState<KitchenAlert[]>([]);
 
   useEffect(() => {
     fetchDashboardData();

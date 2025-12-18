@@ -76,6 +76,11 @@ model Vendor {
   rating          Float        @default(0)
   totalRatings    Int          @default(0)
 
+  // Authentication
+  email           String?      @unique
+  phone           String?      @unique
+  password        String?
+
   // Location
   address         String
   latitude        Float

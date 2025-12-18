@@ -104,15 +104,12 @@ export default function VerifyOTPPage() {
           name: data.data.user.name || 'User',
           email: data.data.user.email,
           avatar: data.data.user.avatar,
-          isKycVerified: data.data.user.isKycVerified,
-          isAgeVerified: data.data.user.isAgeVerified,
-          preferredLanguage: 'en',
-          cuisinePreferences: [],
-          groceryBrands: [],
-          alcoholPreferences: [],
-          wallet: data.data.user.wallet,
-          loyaltyPoints: data.data.user.loyaltyPoints,
-          addresses: data.data.user.addresses,
+          isKycVerified: data.data.user.isKycVerified || false,
+          isAgeVerified: data.data.user.isAgeVerified || false,
+          preferredLanguage: data.data.user.preferredLanguage || 'en',
+          cuisinePreferences: data.data.user.cuisinePreferences || [],
+          groceryBrands: data.data.user.groceryBrands || [],
+          alcoholPreferences: data.data.user.alcoholPreferences || [],
         });
       }
 

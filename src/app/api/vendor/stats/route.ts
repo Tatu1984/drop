@@ -74,34 +74,8 @@ export async function GET(request: NextRequest) {
     const preparingOrders = todayOrders.filter(o => o.status === 'PREPARING').length;
     const completedOrders = todayOrders.filter(o => o.status === 'DELIVERED').length;
 
-    // Get average prep time (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const recentOrders = await prisma.order.findMany({
-      where: {
-        vendorId: vendor.id,
-        createdAt: { gte: thirtyDaysAgo },
-        acceptedAt: { not: null },
-        readyAt: { not: null },
-      },
-      select: {
-        acceptedAt: true,
-        readyAt: true,
-      },
-    });
-
-    let avgPrepTime = vendor.avgDeliveryTime || 0;
-    if (recentOrders.length > 0) {
-      const totalPrepTime = recentOrders.reduce((sum, order) => {
-        if (order.acceptedAt && order.readyAt) {
-          const diff = order.readyAt.getTime() - order.acceptedAt.getTime();
-          return sum + diff / 60000; // Convert to minutes
-        }
-        return sum;
-      }, 0);
-      avgPrepTime = Math.round(totalPrepTime / recentOrders.length);
-    }
+    // Get average prep time from vendor settings
+    const avgPrepTime = vendor.avgDeliveryTime || 30;
 
     return successResponse({
       todayOrders: todayOrdersCount,

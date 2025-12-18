@@ -57,7 +57,7 @@ interface Order {
   assignedRider?: string;
 }
 
-const orderStatuses = ['ALL', 'OPEN', 'PRINTED', 'PAID', 'COMPLETED', 'VOID'];
+const orderStatuses = ['ALL', 'PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED'];
 const orderTypes = ['ALL', 'DINE_IN', 'TAKEAWAY', 'DELIVERY'];
 
 export default function OrdersPage() {
@@ -236,10 +236,10 @@ export default function OrdersPage() {
     }
   };
 
-  const pendingOrders = orders.filter(o => o.status === 'OPEN' || o.status === 'PENDING').length;
-  const preparingOrders = orders.filter(o => o.status === 'PRINTED' || o.status === 'PREPARING').length;
+  const pendingOrders = orders.filter(o => o.status === 'PENDING' || o.status === 'CONFIRMED').length;
+  const preparingOrders = orders.filter(o => o.status === 'PREPARING').length;
   const readyOrders = orders.filter(o => o.status === 'READY').length;
-  const todayRevenue = orders.filter(o => o.status !== 'VOID' && o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total, 0);
+  const todayRevenue = orders.filter(o => o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total, 0);
 
   if (loading) {
     return (
@@ -526,23 +526,31 @@ export default function OrdersPage() {
 
             {/* Actions */}
             <div className="p-4 border-t border-gray-200 space-y-2">
-              {selectedOrder.status === 'OPEN' && (
+              {selectedOrder.status === 'PENDING' && (
                 <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'PRINTED')}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'CONFIRMED')}
                   className="w-full bg-blue-500 hover:bg-blue-600"
                 >
-                  Print KOT
+                  Confirm Order
                 </Button>
               )}
-              {selectedOrder.status === 'PRINTED' && (
+              {selectedOrder.status === 'CONFIRMED' && (
                 <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'PAID')}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'PREPARING')}
+                  className="w-full bg-orange-500 hover:bg-orange-600"
+                >
+                  Start Preparing
+                </Button>
+              )}
+              {selectedOrder.status === 'PREPARING' && (
+                <Button
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'READY')}
                   className="w-full bg-green-500 hover:bg-green-600"
                 >
-                  Mark as Paid
+                  Mark Ready
                 </Button>
               )}
-              {selectedOrder.status === 'PAID' && (
+              {selectedOrder.status === 'READY' && (
                 <Button
                   onClick={() => updateOrderStatus(selectedOrder.id, 'COMPLETED')}
                   className="w-full bg-gray-700 hover:bg-gray-800"

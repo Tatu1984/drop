@@ -8,8 +8,24 @@ import { useCartStore } from '@/store/useStore';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 
+interface ProductCardProduct {
+  id: string;
+  vendorId?: string;
+  name: string;
+  description?: string;
+  images: string[];
+  price: number;
+  discountPrice?: number;
+  rating?: number;
+  isVeg?: boolean;
+  isVegan?: boolean;
+  inStock?: boolean;
+  allergens?: string[];
+  vendor?: { id: string; name: string };
+}
+
 interface ProductCardProps {
-  product: Product;
+  product: ProductCardProduct;
   variant?: 'default' | 'compact' | 'horizontal';
   showVendor?: boolean;
   onClick?: () => void;
@@ -28,7 +44,7 @@ export default function ProductCard({
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
-    addItem(product, 1);
+    addItem(product as Product, 1);
   };
 
   const handleIncrease = (e: React.MouseEvent) => {
@@ -256,7 +272,7 @@ export default function ProductCard({
                 <span className="h-2.5 w-2.5 bg-red-600 rounded-full" />
               </span>
             )}
-            {product.rating > 0 && (
+            {product.rating && product.rating > 0 && (
               <div className="flex items-center gap-0.5">
                 <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
                 <span className="text-xs text-gray-600">{product.rating}</span>

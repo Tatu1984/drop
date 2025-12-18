@@ -4,12 +4,28 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Star, Clock, MapPin, BadgeCheck } from 'lucide-react';
 import { cn, formatDistance, isOpen } from '@/lib/utils';
-import type { Vendor } from '@/types';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 
+interface VendorCardVendor {
+  id: string;
+  name: string;
+  description?: string;
+  logo?: string;
+  coverImage?: string;
+  type: string;
+  rating: number;
+  totalRatings?: number;
+  address?: string;
+  avgDeliveryTime?: number;
+  minimumOrder?: number;
+  isVerified?: boolean;
+  openingTime?: string;
+  closingTime?: string;
+}
+
 interface VendorCardProps {
-  vendor: Vendor;
+  vendor: VendorCardVendor;
   variant?: 'default' | 'compact' | 'horizontal';
   distance?: number; // in meters
 }
@@ -19,7 +35,9 @@ export default function VendorCard({
   variant = 'default',
   distance,
 }: VendorCardProps) {
-  const isCurrentlyOpen = isOpen(vendor.openingTime, vendor.closingTime);
+  const isCurrentlyOpen = vendor.openingTime && vendor.closingTime
+    ? isOpen(vendor.openingTime, vendor.closingTime)
+    : true;
 
   const vendorTypeLabels: Record<string, string> = {
     RESTAURANT: 'Restaurant',
@@ -201,7 +219,7 @@ export default function VendorCard({
                 <span>{formatDistance(distance)}</span>
               </div>
             )}
-            {vendor.minimumOrder > 0 && (
+            {vendor.minimumOrder && vendor.minimumOrder > 0 && (
               <span className="text-gray-400">
                 Min. ₹{vendor.minimumOrder}
               </span>
