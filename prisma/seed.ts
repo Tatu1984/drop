@@ -486,6 +486,7 @@ async function main() {
   // Create admin user
   const bcrypt = await import('bcryptjs');
   const hashedPassword = await bcrypt.hash('admin123', 12);
+  const vendorPassword = await bcrypt.hash('vendor123', 12);
 
   await prisma.admin.create({
     data: {
@@ -498,6 +499,18 @@ async function main() {
   });
 
   console.log('Created admin user (email: admin@drop.com, password: admin123)');
+
+  // Update first vendor with login credentials for demo
+  await prisma.vendor.update({
+    where: { id: vendors[0].id },
+    data: {
+      email: 'vendor@drop.com',
+      phone: '9999999999',
+      password: vendorPassword,
+    },
+  });
+
+  console.log('Updated demo vendor (email: vendor@drop.com, password: vendor123)');
 
   // Create zones
   await Promise.all([
