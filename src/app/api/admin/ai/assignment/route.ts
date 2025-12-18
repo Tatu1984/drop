@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Generate assignment stats
-    const totalAssignments = orders.filter(o => o.riderId).length;
+    const totalAssignments = orders.filter((o: typeof orders[number]) => o.riderId).length;
     const stats = {
       totalAssignments,
       autoAssigned: Math.floor(totalAssignments * 0.75),
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     // Recent assignments
     const assignmentStatuses = ['assigned', 'accepted', 'rejected', 'timeout'] as const;
     const recentAssignments = orders
-      .filter(o => o.riderId)
+      .filter((o: typeof orders[number]) => o.riderId)
       .slice(0, 15)
       .map((order, index) => ({
         id: `assign-${order.id}`,
