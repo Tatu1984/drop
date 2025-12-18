@@ -221,6 +221,12 @@ export default function VendorLoginPage() {
                 </Link>
               </p>
             </div>
+
+            {/* Mobile Demo Credentials */}
+            <div className="lg:hidden mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+              <p className="text-sm font-medium text-green-800 mb-1">Demo Credentials</p>
+              <p className="text-xs text-green-700">Email: vendor@drop.com | Password: vendor123</p>
+            </div>
           </div>
 
           <div className="mt-6 text-center">

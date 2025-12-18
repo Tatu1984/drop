@@ -144,8 +144,30 @@ export default function AuthPage() {
           </div>
         </div>
 
+        {/* Demo Credentials */}
+        <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+          <p className="text-sm font-medium text-orange-800 mb-2">Demo Credentials</p>
+          <p className="text-xs text-orange-700">Phone: Any 10-digit number</p>
+          <p className="text-xs text-orange-700">OTP: 123456</p>
+        </div>
+
+        {/* Portal Links */}
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <a href="/admin/login" className="text-xs text-gray-500 hover:text-orange-500">
+            Admin Portal
+          </a>
+          <span className="text-gray-300">|</span>
+          <a href="/vendor/login" className="text-xs text-gray-500 hover:text-orange-500">
+            Vendor Portal
+          </a>
+          <span className="text-gray-300">|</span>
+          <a href="/rider/login" className="text-xs text-gray-500 hover:text-orange-500">
+            Rider Portal
+          </a>
+        </div>
+
         {/* Terms */}
-        <p className="mt-6 text-xs text-gray-500 text-center">
+        <p className="mt-4 text-xs text-gray-500 text-center">
           By continuing, you agree to our{' '}
           <a href="/terms" className="text-orange-500">
             Terms of Service

@@ -262,6 +262,31 @@ export default function HomePage() {
           <p className="text-gray-500 text-center py-4">No restaurants found</p>
         )}
       </section>
+
+      {/* Portal Links */}
+      <section className="px-4 py-6 border-t border-gray-100">
+        <p className="text-xs text-gray-400 text-center mb-3">Business & Partner Portals</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            href="/admin/login"
+            className="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-orange-100 hover:text-orange-600 transition-colors"
+          >
+            Admin Portal
+          </Link>
+          <Link
+            href="/vendor/login"
+            className="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-orange-100 hover:text-orange-600 transition-colors"
+          >
+            Vendor Portal
+          </Link>
+          <Link
+            href="/rider/login"
+            className="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-orange-100 hover:text-orange-600 transition-colors"
+          >
+            Rider Portal
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

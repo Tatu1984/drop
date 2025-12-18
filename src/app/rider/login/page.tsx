@@ -151,7 +151,9 @@ export default function RiderLoginPage() {
           </div>
 
           <div className="text-white/60 text-sm">
-            <p>Enter your phone number to receive an OTP</p>
+            <p>Demo Credentials:</p>
+            <p>Phone: Any 10-digit number</p>
+            <p>OTP: 123456</p>
           </div>
         </div>
       </div>
@@ -278,6 +280,12 @@ export default function RiderLoginPage() {
                   Become a rider
                 </Link>
               </p>
+            </div>
+
+            {/* Mobile Demo Credentials */}
+            <div className="lg:hidden mt-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <p className="text-sm font-medium text-orange-800 mb-1">Demo Credentials</p>
+              <p className="text-xs text-orange-700">Phone: Any 10-digit number | OTP: 123456</p>
             </div>
           </div>
 
