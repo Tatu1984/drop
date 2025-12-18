@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Star, Gift, TrendingUp, ChevronRight, Award, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Star, Gift, TrendingUp, ChevronRight, Award, Zap, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useWalletStore } from '@/store/useStore';
 import Card from '@/components/ui/Card';
@@ -48,19 +48,49 @@ const tiers = [
   { name: 'Platinum', minPoints: 10000, maxPoints: Infinity, color: 'from-purple-400 to-purple-600', benefits: ['3x points', 'Personal concierge', 'VIP events'] },
 ];
 
-const pointsHistory = [
-  { id: '1', description: 'Order #1234', points: 50, type: 'earned', date: '2024-01-15' },
-  { id: '2', description: 'Redeemed ₹50 Off', points: -500, type: 'redeemed', date: '2024-01-14' },
-  { id: '3', description: 'Order #1230', points: 75, type: 'earned', date: '2024-01-13' },
-  { id: '4', description: 'Referral Bonus', points: 200, type: 'bonus', date: '2024-01-10' },
-  { id: '5', description: 'Order #1225', points: 120, type: 'earned', date: '2024-01-08' },
-];
-
 export default function LoyaltyPage() {
   const { loyaltyPoints } = useWalletStore();
-  const currentPoints = loyaltyPoints?.points || 1250;
+  const [currentPoints, setCurrentPoints] = useState(0);
   const [showRedeemModal, setShowRedeemModal] = useState(false);
   const [selectedReward, setSelectedReward] = useState<typeof rewards[0] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [redeeming, setRedeeming] = useState(false);
+  const [pointsHistory, setPointsHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchLoyaltyData();
+  }, []);
+
+  const fetchLoyaltyData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCurrentPoints(data.data.loyaltyPoints || 0);
+        setPointsHistory(data.data.pointsHistory || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch loyalty data');
+      }
+    } catch (error) {
+      console.error('Error fetching loyalty data:', error);
+      toast.error('Failed to load loyalty data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const currentTier = tiers.find(t => currentPoints >= t.minPoints && currentPoints <= t.maxPoints) || tiers[0];
   const nextTier = tiers[tiers.indexOf(currentTier) + 1];
@@ -68,16 +98,56 @@ export default function LoyaltyPage() {
     ? ((currentPoints - currentTier.minPoints) / (nextTier.minPoints - currentTier.minPoints)) * 100
     : 100;
 
-  const handleRedeem = () => {
+  const handleRedeem = async () => {
     if (!selectedReward) return;
     if (currentPoints < selectedReward.points) {
       toast.error('Not enough points');
       return;
     }
-    toast.success(`Redeemed ${selectedReward.name}!`);
-    setShowRedeemModal(false);
-    setSelectedReward(null);
+
+    try {
+      setRedeeming(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        setRedeeming(false);
+        return;
+      }
+
+      const response = await fetch('/api/loyalty/redeem', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rewardId: selectedReward.id }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`Redeemed ${selectedReward.name}!`);
+        setShowRedeemModal(false);
+        setSelectedReward(null);
+        fetchLoyaltyData();
+      } else {
+        toast.error(data.error || 'Failed to redeem reward');
+      }
+    } catch (error) {
+      console.error('Error redeeming reward:', error);
+      toast.error('Failed to redeem reward');
+    } finally {
+      setRedeeming(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -247,6 +317,7 @@ export default function LoyaltyPage() {
                 fullWidth
                 onClick={handleRedeem}
                 disabled={currentPoints < selectedReward.points}
+                loading={redeeming}
               >
                 Redeem
               </Button>

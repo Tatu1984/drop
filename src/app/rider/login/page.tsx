@@ -3,49 +3,108 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Phone, Lock, Truck, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Phone, Lock, Truck, ArrowRight, Eye, EyeOff, Loader2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { useAuthStore } from '@/store/useStore';
 import toast from 'react-hot-toast';
 
-const DEMO_CREDENTIALS = {
-  phone: '9876543210',
-  password: 'rider123',
-  name: 'Demo Rider',
-  id: 'rider-1',
-};
-
 export default function RiderLoginPage() {
   const router = useRouter();
   const { setRiderUser } = useAuthStore();
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [showOtpInput, setShowOtpInput] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    if (phone === DEMO_CREDENTIALS.phone && password === DEMO_CREDENTIALS.password) {
-      setRiderUser({
-        id: DEMO_CREDENTIALS.id,
-        phone: DEMO_CREDENTIALS.phone,
-        name: DEMO_CREDENTIALS.name,
-        isAuthenticated: true,
-        isVerified: true,
-        status: 'active',
-      });
-      toast.success('Welcome back!');
-      router.push('/rider');
-    } else {
-      toast.error('Invalid credentials. Try: 9876543210 / rider123');
+    if (!phone || phone.length !== 10) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
     }
 
-    setIsLoading(false);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: `+91${phone}`,
+          type: 'rider',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('OTP sent successfully!');
+        setShowOtpInput(true);
+      } else {
+        toast.error(data.error || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      toast.error('Failed to send OTP. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: `+91${phone}`,
+          otp,
+          type: 'rider',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Store token in localStorage
+        localStorage.setItem('rider-token', data.data.token);
+
+        // Update auth store
+        setRiderUser({
+          id: data.data.rider.id,
+          phone: data.data.rider.phone,
+          name: data.data.rider.name,
+          isAuthenticated: true,
+          isVerified: true,
+          status: data.data.rider.status || 'active',
+        });
+
+        toast.success('Welcome back!');
+        router.push('/rider');
+      } else {
+        toast.error(data.error || 'Invalid OTP');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      toast.error('Failed to verify OTP. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -92,9 +151,7 @@ export default function RiderLoginPage() {
           </div>
 
           <div className="text-white/60 text-sm">
-            <p>Demo Credentials:</p>
-            <p>Phone: 9876543210</p>
-            <p>Password: rider123</p>
+            <p>Enter your phone number to receive an OTP</p>
           </div>
         </div>
       </div>
@@ -117,53 +174,102 @@ export default function RiderLoginPage() {
               <p className="text-gray-500">Sign in to your rider account</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex gap-2">
-                <div className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50">
-                  <span className="text-gray-600">+91</span>
+            {!showOtpInput ? (
+              <form onSubmit={handleSendOtp} className="space-y-4">
+                <div className="flex gap-2">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50">
+                    <span className="text-gray-600">+91</span>
+                  </div>
+                  <Input
+                    type="tel"
+                    placeholder="Phone number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    leftIcon={<Phone className="h-5 w-5" />}
+                    className="flex-1"
+                    required
+                    disabled={isLoading}
+                  />
                 </div>
-                <Input
-                  type="tel"
-                  placeholder="Phone number"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  leftIcon={<Phone className="h-5 w-5" />}
-                  className="flex-1"
-                  required
-                />
-              </div>
 
-              <div className="relative">
+                <Button type="submit" fullWidth loading={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Sending OTP...
+                    </>
+                  ) : (
+                    <>
+                      Send OTP <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="flex gap-2">
+                  <div className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50">
+                    <span className="text-gray-600">+91</span>
+                  </div>
+                  <Input
+                    type="tel"
+                    placeholder="Phone number"
+                    value={phone}
+                    leftIcon={<Phone className="h-5 w-5" />}
+                    className="flex-1"
+                    disabled
+                  />
+                </div>
+
                 <Input
-                  label="Password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  label="OTP"
+                  type="text"
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   leftIcon={<Lock className="h-5 w-5" />}
                   required
+                  disabled={isLoading}
+                  maxLength={6}
                 />
+
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    fullWidth
+                    onClick={() => {
+                      setShowOtpInput(false);
+                      setOtp('');
+                    }}
+                    disabled={isLoading}
+                  >
+                    Change Number
+                  </Button>
+                  <Button type="submit" fullWidth loading={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        Verify OTP <ArrowRight className="h-5 w-5" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-9 text-gray-400 hover:text-gray-600"
+                  onClick={handleSendOtp}
+                  className="text-sm text-orange-500 hover:underline w-full text-center"
+                  disabled={isLoading}
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  Resend OTP
                 </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded border-gray-300 text-orange-500 focus:ring-orange-500" />
-                  <span className="text-sm text-gray-600">Remember me</span>
-                </label>
-                <a href="#" className="text-sm text-orange-500 hover:underline">Forgot password?</a>
-              </div>
-
-              <Button type="submit" fullWidth loading={isLoading}>
-                Sign In <ArrowRight className="h-5 w-5" />
-              </Button>
-            </form>
+              </form>
+            )}
 
             <div className="mt-6 text-center">
               <p className="text-gray-500 text-sm">

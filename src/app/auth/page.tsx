@@ -27,13 +27,35 @@ export default function AuthPage() {
 
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, type: 'user' }),
+      });
 
-    setOtpSent(true);
-    toast.success('OTP sent successfully!');
-    router.push('/auth/verify');
-    setIsLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
+      }
+
+      setOtpSent(true);
+      toast.success('OTP sent successfully!');
+
+      // In development, show OTP for testing
+      if (data.data?.otp) {
+        toast(`Dev OTP: ${data.data.otp}`, { icon: '🔑', duration: 10000 });
+      }
+
+      router.push('/auth/verify');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send OTP';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

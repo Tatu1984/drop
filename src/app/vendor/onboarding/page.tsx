@@ -88,9 +88,53 @@ export default function VendorOnboardingPage() {
 
   const handleSubmit = async () => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    toast.success('Application submitted! We\'ll review and contact you within 24-48 hours.');
-    router.push('/vendor/login');
+    try {
+      const response = await fetch('/api/vendor/onboarding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          businessName: formData.businessName,
+          businessType: formData.businessType,
+          cuisines: formData.cuisines,
+          description: formData.description,
+          ownerName: formData.ownerName,
+          phone: formData.phone,
+          email: formData.email,
+          alternatePhone: formData.alternatePhone,
+          password: 'vendor123', // You might want to add a password field in the form
+          gstin: formData.gstin,
+          fssaiLicense: formData.fssaiLicense,
+          panNumber: formData.panNumber,
+          bankAccount: formData.bankAccount,
+          ifscCode: formData.ifscCode,
+          address: formData.address,
+          city: formData.city,
+          pincode: formData.pincode,
+          landmark: formData.landmark,
+          openTime: formData.openTime,
+          closeTime: formData.closeTime,
+          avgPrepTime: formData.avgPrepTime,
+          minOrderValue: formData.minOrderValue,
+          deliveryRadius: formData.deliveryRadius,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(data.message || 'Application submitted successfully!');
+        router.push('/vendor/login');
+      } else {
+        toast.error(data.error || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Onboarding error:', error);
+      toast.error('Failed to submit application. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

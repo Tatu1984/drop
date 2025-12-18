@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Phone, Lock, Store, ArrowRight, Eye, EyeOff, Mail } from 'lucide-react';
+import { Phone, Lock, Store, ArrowRight, Eye, EyeOff, Mail, Loader2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import toast from 'react-hot-toast';
@@ -25,32 +25,43 @@ export default function VendorLoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const response = await fetch('/api/vendor/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginMethod === 'email' ? email : undefined,
+          phone: loginMethod === 'phone' ? phone : undefined,
+          password,
+        }),
+      });
 
-    // Check demo credentials
-    if (loginMethod === 'email' && email === DEMO_CREDENTIALS.vendor.email && password === DEMO_CREDENTIALS.vendor.password) {
-      localStorage.setItem('vendorAuth', JSON.stringify({
-        id: DEMO_CREDENTIALS.vendor.id,
-        name: DEMO_CREDENTIALS.vendor.name,
-        email: DEMO_CREDENTIALS.vendor.email,
-        isAuthenticated: true,
-      }));
-      toast.success('Welcome back!');
-      router.push('/vendor/dashboard');
-    } else if (loginMethod === 'phone' && phone === '9876543210' && password === 'vendor123') {
-      localStorage.setItem('vendorAuth', JSON.stringify({
-        id: 'vendor-1',
-        name: 'Demo Restaurant',
-        phone: phone,
-        isAuthenticated: true,
-      }));
-      toast.success('Welcome back!');
-      router.push('/vendor/dashboard');
-    } else {
-      toast.error('Invalid credentials. Try demo: vendor@drop.com / vendor123');
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Store token and vendor info
+        localStorage.setItem('vendor-token', data.data.token);
+        localStorage.setItem('vendorAuth', JSON.stringify({
+          id: data.data.vendor.id,
+          name: data.data.vendor.name,
+          email: data.data.vendor.email,
+          phone: data.data.vendor.phone,
+          isAuthenticated: true,
+        }));
+
+        toast.success(data.message || 'Welcome back!');
+        router.push('/vendor/dashboard');
+      } else {
+        toast.error(data.error || 'Invalid credentials');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Failed to login. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (

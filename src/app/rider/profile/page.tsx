@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, User, Star, Phone, Mail, MapPin, Car, FileText, Shield, ChevronRight, LogOut, Camera, Award, TrendingUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, User, Star, Phone, Mail, MapPin, Car, FileText, Shield, ChevronRight, LogOut, Camera, Award, TrendingUp, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Card from '@/components/ui/Card';
@@ -10,26 +11,26 @@ import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
 
-const riderData = {
-  name: 'Rajesh Kumar',
-  phone: '9876543210',
-  email: 'rajesh@email.com',
-  rating: 4.8,
-  totalDeliveries: 1250,
-  joinedDate: 'Jan 2023',
-  vehicle: 'Honda Activa 6G',
-  vehicleNumber: 'KA 01 AB 1234',
-  zone: 'Indiranagar, Koramangala',
-  verified: true,
-  tier: 'Gold',
-};
-
-const stats = [
-  { label: 'Total Deliveries', value: '1,250' },
-  { label: 'This Month', value: '156' },
-  { label: 'Avg. Rating', value: '4.8' },
-  { label: 'On-Time %', value: '98%' },
-];
+interface RiderProfile {
+  name: string;
+  phone: string;
+  email: string;
+  rating: number;
+  totalDeliveries: number;
+  joinedDate: string;
+  vehicle: string;
+  vehicleNumber: string;
+  zone: string;
+  verified: boolean;
+  tier: string;
+  stats?: {
+    totalDeliveries: number;
+    thisMonth: number;
+    avgRating: number;
+    onTimePercent: number;
+    acceptanceRate: number;
+  };
+}
 
 const menuItems = [
   { icon: FileText, label: 'Documents', href: '/rider/documents' },
@@ -39,12 +40,80 @@ const menuItems = [
 ];
 
 export default function RiderProfilePage() {
+  const router = useRouter();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [riderData, setRiderData] = useState<RiderProfile>({
+    name: '',
+    phone: '',
+    email: '',
+    rating: 0,
+    totalDeliveries: 0,
+    joinedDate: '',
+    vehicle: '',
+    vehicleNumber: '',
+    zone: '',
+    verified: false,
+    tier: '',
+  });
+
+  // Fetch profile data
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('rider-token');
+        if (!token) {
+          toast.error('Please login to continue');
+          router.push('/rider/login');
+          return;
+        }
+
+        const response = await fetch('/api/rider/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          setRiderData(data.data);
+        } else {
+          toast.error(data.error || 'Failed to fetch profile');
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        toast.error('Failed to fetch profile');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [router]);
 
   const handleLogout = () => {
+    localStorage.removeItem('rider-token');
     toast.success('Logged out successfully');
     setShowLogoutModal(false);
+    router.push('/rider/login');
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: 'Total Deliveries', value: riderData.stats?.totalDeliveries.toString() || riderData.totalDeliveries.toString() },
+    { label: 'This Month', value: riderData.stats?.thisMonth.toString() || '0' },
+    { label: 'Avg. Rating', value: riderData.stats?.avgRating.toFixed(1) || riderData.rating.toFixed(1) },
+    { label: 'On-Time %', value: `${riderData.stats?.onTimePercent || 98}%` },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -148,28 +217,28 @@ export default function RiderProfilePage() {
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">Acceptance Rate</span>
-                <span className="font-medium">95%</span>
+                <span className="font-medium">{riderData.stats?.acceptanceRate || 95}%</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: '95%' }} />
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${riderData.stats?.acceptanceRate || 95}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">On-Time Delivery</span>
-                <span className="font-medium">98%</span>
+                <span className="font-medium">{riderData.stats?.onTimePercent || 98}%</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: '98%' }} />
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${riderData.stats?.onTimePercent || 98}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">Customer Rating</span>
-                <span className="font-medium">4.8/5</span>
+                <span className="font-medium">{riderData.rating.toFixed(1)}/5</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: '96%' }} />
+                <div className="h-full bg-green-500 rounded-full" style={{ width: `${(riderData.rating / 5) * 100}%` }} />
               </div>
             </div>
           </div>

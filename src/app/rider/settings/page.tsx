@@ -24,9 +24,11 @@ import {
   Volume2,
   VolumeX,
   Globe,
+  Save,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import toast from 'react-hot-toast';
 
 interface RiderProfile {
   name: string;
@@ -74,8 +76,44 @@ export default function RiderSettingsPage() {
   const [language, setLanguage] = useState('en');
 
   const handleLogout = () => {
-    localStorage.removeItem('riderAuth');
+    localStorage.removeItem('rider-token');
     router.push('/rider/login');
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch('/api/rider/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          notifications,
+          preferences: {
+            darkMode,
+            language,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Settings saved successfully');
+      } else {
+        toast.error(data.error || 'Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save settings');
+    }
   };
 
   const vehicleIcons: Record<string, any> = {
@@ -275,6 +313,16 @@ export default function RiderSettingsPage() {
             </div>
           </Card>
         )}
+
+        {/* Save Settings */}
+        <Button
+          fullWidth
+          onClick={handleSaveSettings}
+          className="mb-4"
+        >
+          <Save className="h-5 w-5" />
+          Save Settings
+        </Button>
 
         {/* Logout Button */}
         <Card>

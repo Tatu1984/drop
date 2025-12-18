@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Heart, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Heart, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { mockVendors, mockProducts } from '@/data/mockData';
 import VendorCard from '@/components/cards/VendorCard';
 import ProductCard from '@/components/cards/ProductCard';
 import Card from '@/components/ui/Card';
@@ -13,22 +12,110 @@ import toast from 'react-hot-toast';
 
 export default function FavoritesPage() {
   const [activeTab, setActiveTab] = useState('stores');
-  const [favoriteStores, setFavoriteStores] = useState(mockVendors.slice(0, 4));
-  const [favoriteProducts, setFavoriteProducts] = useState(mockProducts.slice(0, 6));
+  const [favoriteStores, setFavoriteStores] = useState<any[]>([]);
+  const [favoriteProducts, setFavoriteProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFavorites();
+  }, [activeTab]);
+
+  const fetchFavorites = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const endpoint = activeTab === 'stores' ? '/api/user/favorites/vendors' : '/api/user/favorites/products';
+      const response = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        if (activeTab === 'stores') {
+          setFavoriteStores(data.data || []);
+        } else {
+          setFavoriteProducts(data.data || []);
+        }
+      } else {
+        toast.error(data.error || 'Failed to fetch favorites');
+      }
+    } catch (error) {
+      console.error('Error fetching favorites:', error);
+      toast.error('Failed to load favorites');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: 'stores', label: 'Stores' },
     { id: 'products', label: 'Products' },
   ];
 
-  const removeStore = (id: string) => {
-    setFavoriteStores(favoriteStores.filter(s => s.id !== id));
-    toast.success('Removed from favorites');
+  const removeStore = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/favorites/vendors/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Removed from favorites');
+        fetchFavorites();
+      } else {
+        toast.error(data.error || 'Failed to remove from favorites');
+      }
+    } catch (error) {
+      console.error('Error removing favorite:', error);
+      toast.error('Failed to remove from favorites');
+    }
   };
 
-  const removeProduct = (id: string) => {
-    setFavoriteProducts(favoriteProducts.filter(p => p.id !== id));
-    toast.success('Removed from favorites');
+  const removeProduct = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/favorites/products/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Removed from favorites');
+        fetchFavorites();
+      } else {
+        toast.error(data.error || 'Failed to remove from favorites');
+      }
+    } catch (error) {
+      console.error('Error removing favorite:', error);
+      toast.error('Failed to remove from favorites');
+    }
   };
 
   return (
@@ -48,7 +135,11 @@ export default function FavoritesPage() {
 
       {/* Content */}
       <div className="p-4">
-        {activeTab === 'stores' && (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+          </div>
+        ) : activeTab === 'stores' && (
           <>
             {favoriteStores.length > 0 ? (
               <div className="space-y-3">
@@ -79,7 +170,7 @@ export default function FavoritesPage() {
           </>
         )}
 
-        {activeTab === 'products' && (
+        {!loading && activeTab === 'products' && (
           <>
             {favoriteProducts.length > 0 ? (
               <div className="grid grid-cols-2 gap-3">

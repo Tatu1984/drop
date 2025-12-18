@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Plus, ArrowUpRight, ArrowDownLeft, Gift, CreditCard } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Plus, ArrowUpRight, ArrowDownLeft, Gift, CreditCard, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useWalletStore } from '@/store/useStore';
 import Card from '@/components/ui/Card';
@@ -12,30 +12,101 @@ import Badge from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-const transactions = [
-  { id: '1', type: 'credit', amount: 100, description: 'Cashback from order #1234', date: '2024-01-15', status: 'completed' },
-  { id: '2', type: 'debit', amount: 250, description: 'Payment for order #1235', date: '2024-01-14', status: 'completed' },
-  { id: '3', type: 'credit', amount: 500, description: 'Added money via UPI', date: '2024-01-13', status: 'completed' },
-  { id: '4', type: 'credit', amount: 50, description: 'Referral bonus', date: '2024-01-12', status: 'completed' },
-  { id: '5', type: 'debit', amount: 180, description: 'Payment for order #1230', date: '2024-01-10', status: 'completed' },
-];
-
 export default function WalletPage() {
   const { wallet } = useWalletStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [addingMoney, setAddingMoney] = useState(false);
 
-  const handleAddMoney = () => {
+  useEffect(() => {
+    fetchWalletData();
+  }, []);
+
+  const fetchWalletData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/wallet', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setWalletBalance(data.data.balance || 0);
+        setTransactions(data.data.transactions || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch wallet data');
+      }
+    } catch (error) {
+      console.error('Error fetching wallet:', error);
+      toast.error('Failed to load wallet data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMoney = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
-    toast.success(`₹${amount} added to wallet`);
-    setShowAddModal(false);
-    setAmount('');
+
+    try {
+      setAddingMoney(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        setAddingMoney(false);
+        return;
+      }
+
+      const response = await fetch('/api/wallet/add', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ amount: parseFloat(amount) }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`₹${amount} added to wallet`);
+        setShowAddModal(false);
+        setAmount('');
+        fetchWalletData();
+      } else {
+        toast.error(data.error || 'Failed to add money');
+      }
+    } catch (error) {
+      console.error('Error adding money:', error);
+      toast.error('Failed to add money');
+    } finally {
+      setAddingMoney(false);
+    }
   };
 
   const quickAmounts = [100, 200, 500, 1000];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -53,7 +124,7 @@ export default function WalletPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-white/80 text-sm">Available Balance</p>
-              <p className="text-3xl font-bold">{formatCurrency(wallet?.balance || 1250)}</p>
+              <p className="text-3xl font-bold">{formatCurrency(walletBalance)}</p>
             </div>
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
               <CreditCard className="h-6 w-6" />
@@ -163,7 +234,7 @@ export default function WalletPage() {
             ))}
           </div>
 
-          <Button fullWidth onClick={handleAddMoney}>
+          <Button fullWidth onClick={handleAddMoney} loading={addingMoney}>
             Add {amount ? formatCurrency(parseFloat(amount)) : 'Money'}
           </Button>
         </div>

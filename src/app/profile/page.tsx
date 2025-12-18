@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -20,6 +20,7 @@ import {
   FileText,
   Shield,
   Headphones,
+  Loader2,
 } from 'lucide-react';
 import { useAuthStore, useWalletStore } from '@/store/useStore';
 import Card from '@/components/ui/Card';
@@ -81,12 +82,58 @@ export default function ProfilePage() {
   const { user, logout } = useAuthStore();
   const { wallet, loyaltyPoints } = useWalletStore();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [orderCount, setOrderCount] = useState(0);
+  const [profileData, setProfileData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const fetchProfileData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setProfileData(data.data);
+        setOrderCount(data.data.orderCount || 0);
+      } else {
+        toast.error(data.error || 'Failed to fetch profile data');
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      toast.error('Failed to load profile data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
     setShowLogoutModal(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -138,7 +185,7 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-500">Points</p>
             </Link>
             <Link href="/orders" className="text-center py-2">
-              <p className="text-lg font-bold text-gray-900">5</p>
+              <p className="text-lg font-bold text-gray-900">{orderCount}</p>
               <p className="text-xs text-gray-500">Orders</p>
             </Link>
           </div>

@@ -12,8 +12,10 @@ import {
   Flame,
   Timer,
   ChefHat,
+  Loader2,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import toast from 'react-hot-toast';
 
 interface KDSItem {
   id: string;
@@ -37,82 +39,6 @@ interface KDSTicket {
   specialInstructions?: string;
 }
 
-const mockTickets: KDSTicket[] = [
-  {
-    id: '1',
-    orderNumber: 'DIN-001',
-    tableNumber: 'T-05',
-    orderType: 'DINE_IN',
-    status: 'NEW',
-    createdAt: new Date(Date.now() - 2 * 60 * 1000),
-    isRush: false,
-    courseNumber: 1,
-    items: [
-      { id: '1a', name: 'Paneer Tikka', quantity: 2, status: 'PENDING' },
-      { id: '1b', name: 'Chicken Tikka', quantity: 1, modifiers: ['Extra Spicy'], status: 'PENDING' },
-    ],
-  },
-  {
-    id: '2',
-    orderNumber: 'DIN-002',
-    tableNumber: 'T-12',
-    orderType: 'DINE_IN',
-    status: 'IN_PROGRESS',
-    createdAt: new Date(Date.now() - 8 * 60 * 1000),
-    isRush: true,
-    courseNumber: 2,
-    specialInstructions: 'NUT ALLERGY - Be careful!',
-    items: [
-      { id: '2a', name: 'Butter Chicken', quantity: 1, status: 'COOKING', notes: 'No nuts' },
-      { id: '2b', name: 'Dal Makhani', quantity: 1, status: 'DONE' },
-      { id: '2c', name: 'Garlic Naan', quantity: 4, status: 'PENDING' },
-    ],
-  },
-  {
-    id: '3',
-    orderNumber: 'DIN-003',
-    tableNumber: 'T-08',
-    orderType: 'DINE_IN',
-    status: 'IN_PROGRESS',
-    createdAt: new Date(Date.now() - 12 * 60 * 1000),
-    isRush: false,
-    courseNumber: 1,
-    items: [
-      { id: '3a', name: 'Chicken Biryani', quantity: 2, status: 'COOKING' },
-      { id: '3b', name: 'Raita', quantity: 2, status: 'DONE' },
-    ],
-  },
-  {
-    id: '4',
-    orderNumber: 'TKY-001',
-    tableNumber: 'TAKEAWAY',
-    orderType: 'TAKEAWAY',
-    status: 'NEW',
-    createdAt: new Date(Date.now() - 5 * 60 * 1000),
-    isRush: false,
-    courseNumber: 1,
-    items: [
-      { id: '4a', name: 'Veg Biryani', quantity: 1, status: 'PENDING' },
-      { id: '4b', name: 'Paneer Butter Masala', quantity: 1, status: 'PENDING' },
-      { id: '4c', name: 'Butter Naan', quantity: 2, status: 'PENDING' },
-    ],
-  },
-  {
-    id: '5',
-    orderNumber: 'DIN-004',
-    tableNumber: 'T-03',
-    orderType: 'DINE_IN',
-    status: 'READY',
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-    isRush: false,
-    courseNumber: 1,
-    items: [
-      { id: '5a', name: 'Gulab Jamun', quantity: 2, status: 'DONE' },
-      { id: '5b', name: 'Masala Chai', quantity: 2, status: 'DONE' },
-    ],
-  },
-];
-
 const stations = [
   { id: 'all', name: 'All Stations', color: 'bg-gray-500' },
   { id: 'hot', name: 'Hot Kitchen', color: 'bg-red-500' },
@@ -122,7 +48,8 @@ const stations = [
 ];
 
 export default function KDSPage() {
-  const [tickets, setTickets] = useState<KDSTicket[]>(mockTickets);
+  const [loading, setLoading] = useState(true);
+  const [tickets, setTickets] = useState<KDSTicket[]>([]);
   const [selectedStation, setSelectedStation] = useState('all');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -133,6 +60,66 @@ export default function KDSPage() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    fetchTickets();
+    // Poll for new tickets every 10 seconds
+    const pollInterval = setInterval(fetchTickets, 10000);
+    return () => clearInterval(pollInterval);
+  }, [selectedStation]);
+
+  const fetchTickets = async () => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+      const stationId = localStorage.getItem('vendor-kds-stationId');
+
+      if (!token || !stationId) {
+        toast.error('KDS station not configured');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/kds/tickets?stationId=${stationId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to fetch tickets');
+        return;
+      }
+
+      // Map API response to local KDSTicket interface
+      const mappedTickets: KDSTicket[] = result.data.map((ticket: any) => ({
+        id: ticket.id,
+        orderNumber: ticket.orderNumber,
+        tableNumber: ticket.tableNumber || 'TAKEAWAY',
+        orderType: ticket.orderType,
+        status: ticket.status,
+        createdAt: new Date(ticket.createdAt),
+        isRush: ticket.isRush || false,
+        courseNumber: ticket.courseNumber || 1,
+        specialInstructions: ticket.specialInstructions,
+        items: ticket.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          modifiers: item.modifiers ? JSON.parse(item.modifiers) : undefined,
+          notes: item.specialInstructions,
+          status: item.status || 'PENDING',
+        })),
+      }));
+
+      setTickets(mappedTickets);
+    } catch (error) {
+      console.error('Error fetching KDS tickets:', error);
+      toast.error('Failed to load tickets');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getTicketAge = (createdAt: Date) => {
     const diff = currentTime.getTime() - createdAt.getTime();
@@ -166,43 +153,137 @@ export default function KDSPage() {
     }
   };
 
-  const updateTicketStatus = (ticketId: string, newStatus: KDSTicket['status']) => {
-    setTickets(tickets.map(ticket => {
-      if (ticket.id === ticketId) {
-        return { ...ticket, status: newStatus };
+  const updateTicketStatus = async (ticketId: string, newStatus: KDSTicket['status']) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
       }
-      return ticket;
-    }));
+
+      const response = await fetch(`/api/rms/kds/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to update ticket status');
+        return;
+      }
+
+      // Update local state
+      setTickets(tickets.map(ticket => {
+        if (ticket.id === ticketId) {
+          return { ...ticket, status: newStatus };
+        }
+        return ticket;
+      }));
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      toast.error('Failed to update ticket status');
+    }
   };
 
-  const updateItemStatus = (ticketId: string, itemId: string, newStatus: KDSItem['status']) => {
-    setTickets(tickets.map(ticket => {
-      if (ticket.id === ticketId) {
-        const updatedItems = ticket.items.map(item => {
-          if (item.id === itemId) {
-            return { ...item, status: newStatus };
-          }
-          return item;
-        });
-        // Check if all items are done
-        const allDone = updatedItems.every(item => item.status === 'DONE');
-        return {
-          ...ticket,
-          items: updatedItems,
-          status: allDone ? 'READY' : ticket.status === 'NEW' ? 'IN_PROGRESS' : ticket.status
-        };
+  const updateItemStatus = async (ticketId: string, itemId: string, newStatus: KDSItem['status']) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
       }
-      return ticket;
-    }));
+
+      const response = await fetch(`/api/rms/kds/tickets/${ticketId}/items/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to update item status');
+        return;
+      }
+
+      // Update local state
+      setTickets(tickets.map(ticket => {
+        if (ticket.id === ticketId) {
+          const updatedItems = ticket.items.map(item => {
+            if (item.id === itemId) {
+              return { ...item, status: newStatus };
+            }
+            return item;
+          });
+          // Check if all items are done
+          const allDone = updatedItems.every(item => item.status === 'DONE');
+          return {
+            ...ticket,
+            items: updatedItems,
+            status: allDone ? 'READY' : ticket.status === 'NEW' ? 'IN_PROGRESS' : ticket.status
+          };
+        }
+        return ticket;
+      }));
+    } catch (error) {
+      console.error('Error updating item status:', error);
+      toast.error('Failed to update item status');
+    }
   };
 
-  const bumpTicket = (ticketId: string) => {
-    setTickets(tickets.filter(t => t.id !== ticketId));
+  const bumpTicket = async (ticketId: string) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/kds/tickets/${ticketId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to bump ticket');
+        return;
+      }
+
+      // Remove from local state
+      setTickets(tickets.filter(t => t.id !== ticketId));
+      toast.success('Ticket bumped');
+    } catch (error) {
+      console.error('Error bumping ticket:', error);
+      toast.error('Failed to bump ticket');
+    }
   };
 
   const newTickets = tickets.filter(t => t.status === 'NEW');
   const inProgressTickets = tickets.filter(t => t.status === 'IN_PROGRESS');
   const readyTickets = tickets.filter(t => t.status === 'READY');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -240,7 +321,7 @@ export default function KDSPage() {
             >
               {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
             </button>
-            <button className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600">
+            <button onClick={fetchTickets} className="p-2 rounded-lg bg-gray-700 hover:bg-gray-600">
               <RefreshCw className="h-5 w-5" />
             </button>
           </div>

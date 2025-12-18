@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   Search,
@@ -21,8 +21,10 @@ import {
   Bike,
   RefreshCw,
   MoreVertical,
+  Loader2,
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import toast from 'react-hot-toast';
 
 interface OrderItem {
   id: string;
@@ -55,120 +57,87 @@ interface Order {
   assignedRider?: string;
 }
 
-const mockOrders: Order[] = [
-  {
-    id: '1',
-    orderNumber: 'DIN-001',
-    type: 'DINE_IN',
-    status: 'PREPARING',
-    tableNumber: 'T-05',
-    customerName: 'Walk-in',
-    customerPhone: '-',
-    items: [
-      { id: '1a', name: 'Paneer Tikka', quantity: 2, price: 320, status: 'PREPARING' },
-      { id: '1b', name: 'Butter Chicken', quantity: 1, price: 420, modifiers: ['Extra Gravy'], status: 'PENDING' },
-      { id: '1c', name: 'Garlic Naan', quantity: 4, price: 60, status: 'READY' },
-    ],
-    subtotal: 1300,
-    tax: 65,
-    discount: 0,
-    total: 1365,
-    paymentStatus: 'PENDING',
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-  },
-  {
-    id: '2',
-    orderNumber: 'TKY-015',
-    type: 'TAKEAWAY',
-    status: 'READY',
-    customerName: 'Rahul Sharma',
-    customerPhone: '+91 98765 43210',
-    items: [
-      { id: '2a', name: 'Chicken Biryani', quantity: 2, price: 450, status: 'READY' },
-      { id: '2b', name: 'Raita', quantity: 2, price: 60, status: 'READY' },
-    ],
-    subtotal: 1020,
-    tax: 51,
-    discount: 100,
-    total: 971,
-    paymentStatus: 'PAID',
-    paymentMethod: 'UPI',
-    createdAt: new Date(Date.now() - 25 * 60 * 1000),
-  },
-  {
-    id: '3',
-    orderNumber: 'DEL-042',
-    type: 'DELIVERY',
-    status: 'PREPARING',
-    customerName: 'Priya Mehta',
-    customerPhone: '+91 98765 43211',
-    items: [
-      { id: '3a', name: 'Veg Biryani', quantity: 1, price: 380, status: 'PREPARING' },
-      { id: '3b', name: 'Paneer Butter Masala', quantity: 1, price: 340, status: 'PENDING' },
-      { id: '3c', name: 'Butter Naan', quantity: 3, price: 50, status: 'READY' },
-    ],
-    subtotal: 870,
-    tax: 44,
-    discount: 0,
-    total: 914,
-    paymentStatus: 'PAID',
-    paymentMethod: 'Card',
-    createdAt: new Date(Date.now() - 10 * 60 * 1000),
-    deliveryAddress: '123, Green Park, Sector 45, Gurgaon',
-    assignedRider: 'Amit Kumar',
-  },
-  {
-    id: '4',
-    orderNumber: 'DIN-002',
-    type: 'DINE_IN',
-    status: 'SERVED',
-    tableNumber: 'T-12',
-    customerName: 'Reserved - Mr. Kapoor',
-    customerPhone: '+91 98765 43212',
-    items: [
-      { id: '4a', name: 'Tandoori Platter', quantity: 1, price: 850, status: 'SERVED' },
-      { id: '4b', name: 'Dal Makhani', quantity: 1, price: 280, status: 'SERVED' },
-      { id: '4c', name: 'Assorted Naan', quantity: 1, price: 180, status: 'SERVED' },
-      { id: '4d', name: 'Gulab Jamun', quantity: 2, price: 120, status: 'SERVED' },
-    ],
-    subtotal: 1550,
-    tax: 78,
-    discount: 155,
-    total: 1473,
-    paymentStatus: 'PENDING',
-    createdAt: new Date(Date.now() - 45 * 60 * 1000),
-    notes: 'VIP Guest - Extra attention',
-  },
-  {
-    id: '5',
-    orderNumber: 'DIN-003',
-    type: 'DINE_IN',
-    status: 'PENDING',
-    tableNumber: 'T-08',
-    customerName: 'Walk-in',
-    customerPhone: '-',
-    items: [
-      { id: '5a', name: 'Chicken Tikka', quantity: 1, price: 380, status: 'PENDING' },
-      { id: '5b', name: 'Mutton Rogan Josh', quantity: 1, price: 520, status: 'PENDING' },
-    ],
-    subtotal: 900,
-    tax: 45,
-    discount: 0,
-    total: 945,
-    paymentStatus: 'PENDING',
-    createdAt: new Date(Date.now() - 2 * 60 * 1000),
-  },
-];
-
-const orderStatuses = ['ALL', 'PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED', 'COMPLETED', 'CANCELLED'];
+const orderStatuses = ['ALL', 'OPEN', 'PRINTED', 'PAID', 'COMPLETED', 'VOID'];
 const orderTypes = ['ALL', 'DINE_IN', 'TAKEAWAY', 'DELIVERY'];
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [statusFilter, typeFilter]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('vendor-token');
+      const outletId = localStorage.getItem('vendor-outletId');
+
+      if (!token || !outletId) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      let url = `/api/rms/orders?outletId=${outletId}`;
+      if (statusFilter !== 'ALL') {
+        url += `&status=${statusFilter}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to fetch orders');
+        return;
+      }
+
+      // Map API response to local Order interface
+      const mappedOrders: Order[] = result.data.map((order: any) => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        type: order.orderType,
+        status: order.status,
+        tableNumber: order.table?.tableNumber || '-',
+        customerName: order.guestName || 'Walk-in',
+        customerPhone: order.guestPhone || '-',
+        items: order.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.unitPrice,
+          modifiers: item.modifiers ? JSON.parse(item.modifiers) : undefined,
+          notes: item.specialInstructions,
+          status: item.status || 'PENDING',
+        })),
+        subtotal: order.subtotal,
+        tax: order.taxAmount,
+        discount: order.discount || 0,
+        total: order.total,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.payments?.[0]?.method,
+        createdAt: new Date(order.createdAt),
+        notes: order.notes,
+        deliveryAddress: order.deliveryAddress,
+      }));
+
+      setOrders(mappedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -180,15 +149,19 @@ export default function OrdersPage() {
 
   const getStatusBadge = (status: Order['status']) => {
     const styles: Record<string, string> = {
+      OPEN: 'bg-blue-100 text-blue-700',
+      PRINTED: 'bg-yellow-100 text-yellow-700',
+      PAID: 'bg-green-100 text-green-700',
+      COMPLETED: 'bg-gray-100 text-gray-700',
+      VOID: 'bg-red-100 text-red-700',
       PENDING: 'bg-yellow-100 text-yellow-700',
       CONFIRMED: 'bg-blue-100 text-blue-700',
       PREPARING: 'bg-orange-100 text-orange-700',
       READY: 'bg-green-100 text-green-700',
       SERVED: 'bg-purple-100 text-purple-700',
-      COMPLETED: 'bg-gray-100 text-gray-700',
       CANCELLED: 'bg-red-100 text-red-700',
     };
-    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>{status}</span>;
+    return <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100 text-gray-700'}`}>{status}</span>;
   };
 
   const getTypeBadge = (type: Order['type']) => {
@@ -223,19 +196,60 @@ export default function OrdersPage() {
     return `${hours}h ${minutes % 60}m ago`;
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: Order['status']) => {
-    setOrders(orders.map(order =>
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
+  const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to update order status');
+        return;
+      }
+
+      // Update local state
+      setOrders(orders.map(order =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      ));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+      }
+
+      toast.success('Order status updated');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Failed to update order status');
     }
   };
 
-  const pendingOrders = orders.filter(o => o.status === 'PENDING').length;
-  const preparingOrders = orders.filter(o => o.status === 'PREPARING').length;
+  const pendingOrders = orders.filter(o => o.status === 'OPEN' || o.status === 'PENDING').length;
+  const preparingOrders = orders.filter(o => o.status === 'PRINTED' || o.status === 'PREPARING').length;
   const readyOrders = orders.filter(o => o.status === 'READY').length;
-  const todayRevenue = orders.filter(o => o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total, 0);
+  const todayRevenue = orders.filter(o => o.status !== 'VOID' && o.status !== 'CANCELLED').reduce((sum, o) => sum + o.total, 0);
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -246,7 +260,7 @@ export default function OrdersPage() {
           <p className="text-gray-600">View and manage all orders</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="flex items-center gap-2">
+          <Button variant="outline" className="flex items-center gap-2" onClick={fetchOrders}>
             <RefreshCw className="h-4 w-4" />
             Refresh
           </Button>
@@ -512,39 +526,23 @@ export default function OrdersPage() {
 
             {/* Actions */}
             <div className="p-4 border-t border-gray-200 space-y-2">
-              {selectedOrder.status === 'PENDING' && (
+              {selectedOrder.status === 'OPEN' && (
                 <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'CONFIRMED')}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'PRINTED')}
                   className="w-full bg-blue-500 hover:bg-blue-600"
                 >
-                  Confirm Order
+                  Print KOT
                 </Button>
               )}
-              {selectedOrder.status === 'CONFIRMED' && (
+              {selectedOrder.status === 'PRINTED' && (
                 <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'PREPARING')}
-                  className="w-full bg-orange-500 hover:bg-orange-600"
-                >
-                  Start Preparing
-                </Button>
-              )}
-              {selectedOrder.status === 'PREPARING' && (
-                <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'READY')}
+                  onClick={() => updateOrderStatus(selectedOrder.id, 'PAID')}
                   className="w-full bg-green-500 hover:bg-green-600"
                 >
-                  Mark Ready
+                  Mark as Paid
                 </Button>
               )}
-              {selectedOrder.status === 'READY' && selectedOrder.type === 'DINE_IN' && (
-                <Button
-                  onClick={() => updateOrderStatus(selectedOrder.id, 'SERVED')}
-                  className="w-full bg-purple-500 hover:bg-purple-600"
-                >
-                  Mark Served
-                </Button>
-              )}
-              {(selectedOrder.status === 'SERVED' || (selectedOrder.status === 'READY' && selectedOrder.type !== 'DINE_IN')) && (
+              {selectedOrder.status === 'PAID' && (
                 <Button
                   onClick={() => updateOrderStatus(selectedOrder.id, 'COMPLETED')}
                   className="w-full bg-gray-700 hover:bg-gray-800"

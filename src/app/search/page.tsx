@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -10,14 +10,36 @@ import {
   Mic,
   MicOff,
   SlidersHorizontal,
+  Loader2,
 } from 'lucide-react';
 import { useSearchStore } from '@/store/useStore';
-import { allProducts, allVendors } from '@/data/mockData';
 import ProductCard from '@/components/cards/ProductCard';
 import VendorCard from '@/components/cards/VendorCard';
 import Input from '@/components/ui/Input';
 import Tabs from '@/components/ui/Tabs';
 import toast from 'react-hot-toast';
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  images: string[];
+  price: number;
+  discountPrice?: number;
+  rating: number;
+  isVeg: boolean;
+  vendor?: { id: string; name: string };
+}
+
+interface Vendor {
+  id: string;
+  name: string;
+  description?: string;
+  logo?: string;
+  type: string;
+  rating: number;
+  avgDeliveryTime: number;
+}
 
 const trendingSearches = [
   'Biryani',
@@ -42,10 +64,12 @@ export default function SearchPage() {
 
   const [activeTab, setActiveTab] = useState('all');
   const [results, setResults] = useState<{
-    products: typeof allProducts;
-    vendors: typeof allVendors;
+    products: Product[];
+    vendors: Vendor[];
   }>({ products: [], vendors: [] });
   const [isListening, setIsListening] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Voice search handler
   const handleVoiceSearch = useCallback(() => {
@@ -89,24 +113,47 @@ export default function SearchPage() {
     recognition.start();
   }, [setQuery, addRecentSearch]);
 
-  // Search effect
+  // Search effect with debouncing
   useEffect(() => {
-    if (query.trim()) {
-      const lowerQuery = query.toLowerCase();
-      const matchedProducts = allProducts.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lowerQuery) ||
-          p.description?.toLowerCase().includes(lowerQuery)
-      );
-      const matchedVendors = allVendors.filter(
-        (v) =>
-          v.name.toLowerCase().includes(lowerQuery) ||
-          v.description?.toLowerCase().includes(lowerQuery)
-      );
-      setResults({ products: matchedProducts, vendors: matchedVendors });
-    } else {
-      setResults({ products: [], vendors: [] });
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
+
+    if (!query.trim()) {
+      setResults({ products: [], vendors: [] });
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const [productsRes, vendorsRes] = await Promise.all([
+          fetch(`/api/products?search=${encodeURIComponent(query)}&limit=20`),
+          fetch(`/api/vendors?search=${encodeURIComponent(query)}&limit=10`),
+        ]);
+
+        const productsData = productsRes.ok ? await productsRes.json() : { data: { data: [] } };
+        const vendorsData = vendorsRes.ok ? await vendorsRes.json() : { data: { data: [] } };
+
+        setResults({
+          products: productsData.data?.data || [],
+          vendors: vendorsData.data?.data || [],
+        });
+      } catch (error) {
+        console.error('Search error:', error);
+        setResults({ products: [], vendors: [] });
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
   }, [query]);
 
   const handleSearch = (searchQuery: string) => {
@@ -222,6 +269,11 @@ export default function SearchPage() {
               </div>
             </div>
           </>
+        ) : isSearching ? (
+          <div className="text-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
+            <p className="text-gray-500">Searching...</p>
+          </div>
         ) : !hasResults ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

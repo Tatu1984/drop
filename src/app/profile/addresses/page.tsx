@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Plus, MapPin, Home, Briefcase, Heart, MoreVertical, Edit2, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Plus, MapPin, Home, Briefcase, Heart, MoreVertical, Edit2, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -19,35 +19,52 @@ interface Address {
   isDefault: boolean;
 }
 
-const initialAddresses: Address[] = [
-  {
-    id: '1',
-    type: 'home',
-    label: 'Home',
-    address: '123 MG Road, Indiranagar, Bangalore 560038',
-    landmark: 'Near Metro Station',
-    isDefault: true,
-  },
-  {
-    id: '2',
-    type: 'work',
-    label: 'Office',
-    address: '456 Koramangala 4th Block, Bangalore 560034',
-    landmark: 'Sony World Junction',
-    isDefault: false,
-  },
-];
-
 export default function AddressesPage() {
-  const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
+  const [addresses, setAddresses] = useState<Address[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     type: 'home' as 'home' | 'work' | 'other',
     label: '',
     address: '',
     landmark: '',
   });
+
+  useEffect(() => {
+    fetchAddresses();
+  }, []);
+
+  const fetchAddresses = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/addresses', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setAddresses(data.data || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch addresses');
+      }
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+      toast.error('Failed to load addresses');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -60,45 +77,128 @@ export default function AddressesPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.address) {
       toast.error('Please enter an address');
       return;
     }
 
-    if (editingAddress) {
-      setAddresses(addresses.map(addr =>
-        addr.id === editingAddress.id
-          ? { ...addr, ...formData }
-          : addr
-      ));
-      toast.success('Address updated');
-    } else {
-      const newAddress: Address = {
-        id: Date.now().toString(),
-        ...formData,
-        isDefault: addresses.length === 0,
-      };
-      setAddresses([...addresses, newAddress]);
-      toast.success('Address added');
+    try {
+      setSaving(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        setSaving(false);
+        return;
+      }
+
+      if (editingAddress) {
+        // Update existing address
+        const response = await fetch(`/api/user/addresses/${editingAddress.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          toast.success('Address updated');
+          fetchAddresses();
+        } else {
+          toast.error(data.error || 'Failed to update address');
+        }
+      } else {
+        // Create new address
+        const response = await fetch('/api/user/addresses', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          toast.success('Address added');
+          fetchAddresses();
+        } else {
+          toast.error(data.error || 'Failed to add address');
+        }
+      }
+
+      setShowAddModal(false);
+      setEditingAddress(null);
+      setFormData({ type: 'home', label: '', address: '', landmark: '' });
+    } catch (error) {
+      console.error('Error saving address:', error);
+      toast.error('Failed to save address');
+    } finally {
+      setSaving(false);
     }
-
-    setShowAddModal(false);
-    setEditingAddress(null);
-    setFormData({ type: 'home', label: '', address: '', landmark: '' });
   };
 
-  const handleDelete = (id: string) => {
-    setAddresses(addresses.filter(addr => addr.id !== id));
-    toast.success('Address deleted');
+  const handleDelete = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/addresses/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Address deleted');
+        fetchAddresses();
+      } else {
+        toast.error(data.error || 'Failed to delete address');
+      }
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      toast.error('Failed to delete address');
+    }
   };
 
-  const handleSetDefault = (id: string) => {
-    setAddresses(addresses.map(addr => ({
-      ...addr,
-      isDefault: addr.id === id,
-    })));
-    toast.success('Default address updated');
+  const handleSetDefault = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/addresses/${id}/default`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Default address updated');
+        fetchAddresses();
+      } else {
+        toast.error(data.error || 'Failed to update default address');
+      }
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      toast.error('Failed to update default address');
+    }
   };
 
   const openEditModal = (address: Address) => {
@@ -111,6 +211,14 @@ export default function AddressesPage() {
     });
     setShowAddModal(true);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -253,7 +361,7 @@ export default function AddressesPage() {
             onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
           />
 
-          <Button fullWidth onClick={handleSave}>
+          <Button fullWidth onClick={handleSave} loading={saving}>
             {editingAddress ? 'Update Address' : 'Save Address'}
           </Button>
         </div>

@@ -1,19 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Copy, Share2, Gift, Users, Wallet, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Copy, Share2, Gift, Users, Wallet, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import toast from 'react-hot-toast';
-
-const referralHistory = [
-  { id: '1', name: 'Rahul Sharma', status: 'completed', reward: 100, date: '2024-01-15' },
-  { id: '2', name: 'Priya Patel', status: 'pending', reward: 100, date: '2024-01-14' },
-  { id: '3', name: 'Amit Kumar', status: 'completed', reward: 100, date: '2024-01-10' },
-];
 
 const steps = [
   { icon: Share2, title: 'Share your code', description: 'Share your unique referral code with friends' },
@@ -22,11 +16,49 @@ const steps = [
 ];
 
 export default function ReferralPage() {
-  const referralCode = 'DROP100XYZ';
+  const [referralCode, setReferralCode] = useState('');
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [referralHistory, setReferralHistory] = useState<any[]>([]);
+  const [totalEarned, setTotalEarned] = useState(0);
+  const [totalReferrals, setTotalReferrals] = useState(0);
 
-  const totalEarned = referralHistory.filter(r => r.status === 'completed').reduce((acc, r) => acc + r.reward, 0);
-  const totalReferrals = referralHistory.length;
+  useEffect(() => {
+    fetchReferralData();
+  }, []);
+
+  const fetchReferralData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/referrals', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setReferralCode(data.data.referralCode || '');
+        setReferralHistory(data.data.referrals || []);
+        setTotalEarned(data.data.totalEarned || 0);
+        setTotalReferrals(data.data.totalReferrals || 0);
+      } else {
+        toast.error(data.error || 'Failed to fetch referral data');
+      }
+    } catch (error) {
+      console.error('Error fetching referrals:', error);
+      toast.error('Failed to load referral data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const copyCode = () => {
     navigator.clipboard.writeText(referralCode);
@@ -52,6 +84,14 @@ export default function ReferralPage() {
       copyCode();
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

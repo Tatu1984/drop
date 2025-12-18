@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Bell, Globe, Moon, Shield, Smartphone, Volume2, Vibrate } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Bell, Globe, Moon, Shield, Smartphone, Volume2, Vibrate, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import toast from 'react-hot-toast';
@@ -54,6 +54,50 @@ export default function SettingsPage() {
   ]);
 
   const [language, setLanguage] = useState('en');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        if (data.data.notifications) {
+          setSettings(prevSettings =>
+            prevSettings.map(s => ({
+              ...s,
+              enabled: data.data.notifications[s.id] !== undefined
+                ? data.data.notifications[s.id]
+                : s.enabled,
+            }))
+          );
+        }
+        if (data.data.language) {
+          setLanguage(data.data.language);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   const languages = [
     { code: 'en', name: 'English' },
     { code: 'hi', name: 'हिंदी' },
@@ -62,12 +106,98 @@ export default function SettingsPage() {
     { code: 'te', name: 'తెలుగు' },
   ];
 
-  const toggleSetting = (id: string) => {
-    setSettings(settings.map(s =>
+  const toggleSetting = async (id: string) => {
+    const updatedSettings = settings.map(s =>
       s.id === id ? { ...s, enabled: !s.enabled } : s
-    ));
-    toast.success('Setting updated');
+    );
+    setSettings(updatedSettings);
+
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const notificationsObj: Record<string, boolean> = {};
+      updatedSettings.forEach(s => {
+        notificationsObj[s.id] = s.enabled;
+      });
+
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          notifications: notificationsObj,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Setting updated');
+      } else {
+        toast.error(data.error || 'Failed to update setting');
+        // Revert on error
+        fetchSettings();
+      }
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      toast.error('Failed to update setting');
+      // Revert on error
+      fetchSettings();
+    }
   };
+
+  const updateLanguage = async (langCode: string) => {
+    const previousLang = language;
+    setLanguage(langCode);
+
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        setLanguage(previousLang);
+        return;
+      }
+
+      const response = await fetch('/api/user/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          language: langCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const lang = languages.find(l => l.code === langCode);
+        toast.success(`Language changed to ${lang?.name}`);
+      } else {
+        toast.error(data.error || 'Failed to update language');
+        setLanguage(previousLang);
+      }
+    } catch (error) {
+      console.error('Error updating language:', error);
+      toast.error('Failed to update language');
+      setLanguage(previousLang);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -172,10 +302,7 @@ export default function SettingsPage() {
                 {languages.map((lang) => (
                   <button
                     key={lang.code}
-                    onClick={() => {
-                      setLanguage(lang.code);
-                      toast.success(`Language changed to ${lang.name}`);
-                    }}
+                    onClick={() => updateLanguage(lang.code)}
                     className={`p-3 rounded-lg border text-center transition-colors ${
                       language === lang.code
                         ? 'border-orange-500 bg-orange-50 text-orange-600'

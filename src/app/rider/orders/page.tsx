@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, MapPin, Clock, Phone, Navigation, Package, CheckCircle, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, MapPin, Clock, Phone, Navigation, Package, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 
 interface Order {
   id: string;
+  orderNumber?: string;
   restaurant: string;
   customer: string;
   customerPhone: string;
@@ -25,54 +26,46 @@ interface Order {
   time: string;
 }
 
-const orders: Order[] = [
-  {
-    id: 'ORD1234',
-    restaurant: 'Burger King',
-    customer: 'Rahul Sharma',
-    customerPhone: '9876543210',
-    pickup: '123 MG Road, Indiranagar',
-    dropoff: '456 HSR Layout, Sector 1',
-    items: 3,
-    total: 450,
-    earning: 55,
-    distance: '4.2 km',
-    status: 'pending',
-    time: '2 min ago',
-  },
-  {
-    id: 'ORD1235',
-    restaurant: 'Dominos Pizza',
-    customer: 'Priya Patel',
-    customerPhone: '9876543211',
-    pickup: '789 Koramangala 4th Block',
-    dropoff: '321 BTM Layout 2nd Stage',
-    items: 2,
-    total: 599,
-    earning: 45,
-    distance: '3.5 km',
-    status: 'accepted',
-    time: '10 min ago',
-  },
-  {
-    id: 'ORD1236',
-    restaurant: 'KFC',
-    customer: 'Amit Kumar',
-    customerPhone: '9876543212',
-    pickup: '555 Whitefield Main Road',
-    dropoff: '777 Marathahalli Bridge',
-    items: 4,
-    total: 750,
-    earning: 65,
-    distance: '5.8 km',
-    status: 'delivered',
-    time: '1 hour ago',
-  },
-];
-
 export default function RiderOrdersPage() {
   const [activeTab, setActiveTab] = useState('active');
-  const [ordersList, setOrdersList] = useState(orders);
+  const [ordersList, setOrdersList] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Fetch orders from API
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch('/api/rider/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.orders) {
+        setOrdersList(data.data.orders);
+      } else {
+        toast.error(data.error || 'Failed to fetch orders');
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to fetch orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   const tabs = [
     { id: 'active', label: 'Active' },
@@ -82,30 +75,86 @@ export default function RiderOrdersPage() {
   const activeOrders = ordersList.filter(o => ['pending', 'accepted', 'picked_up'].includes(o.status));
   const completedOrders = ordersList.filter(o => ['delivered', 'cancelled'].includes(o.status));
 
-  const handleAccept = (orderId: string) => {
-    setOrdersList(ordersList.map(o =>
-      o.id === orderId ? { ...o, status: 'accepted' as const } : o
-    ));
-    toast.success('Order accepted!');
+  const handleOrderAction = async (orderId: string, action: 'accept' | 'pickup' | 'deliver') => {
+    setActionLoading(orderId);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch('/api/rider/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId,
+          action,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(
+          action === 'accept' ? 'Order accepted!' :
+          action === 'pickup' ? 'Order picked up!' :
+          'Order delivered!'
+        );
+        fetchOrders(); // Refresh orders
+      } else {
+        toast.error(data.error || 'Failed to update order');
+      }
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast.error('Failed to update order');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const handleReject = (orderId: string) => {
-    setOrdersList(ordersList.filter(o => o.id !== orderId));
-    toast.success('Order rejected');
-  };
+  const handleAccept = (orderId: string) => handleOrderAction(orderId, 'accept');
+  const handlePickedUp = (orderId: string) => handleOrderAction(orderId, 'pickup');
+  const handleDelivered = (orderId: string) => handleOrderAction(orderId, 'deliver');
 
-  const handlePickedUp = (orderId: string) => {
-    setOrdersList(ordersList.map(o =>
-      o.id === orderId ? { ...o, status: 'picked_up' as const } : o
-    ));
-    toast.success('Order picked up!');
-  };
+  const handleReject = async (orderId: string) => {
+    setActionLoading(orderId);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
 
-  const handleDelivered = (orderId: string) => {
-    setOrdersList(ordersList.map(o =>
-      o.id === orderId ? { ...o, status: 'delivered' as const } : o
-    ));
-    toast.success('Order delivered!');
+      const response = await fetch('/api/rider/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId,
+          action: 'reject',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Order rejected');
+        fetchOrders(); // Refresh orders
+      } else {
+        toast.error(data.error || 'Failed to reject order');
+      }
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      toast.error('Failed to reject order');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -144,7 +193,11 @@ export default function RiderOrdersPage() {
 
       {/* Orders List */}
       <div className="p-4 space-y-4">
-        {displayOrders.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+          </div>
+        ) : displayOrders.length > 0 ? (
           displayOrders.map((order) => (
             <Card key={order.id} padding="none">
               <div className="p-4">
@@ -218,28 +271,54 @@ export default function RiderOrdersPage() {
                         fullWidth
                         onClick={() => handleReject(order.id)}
                         className="text-red-500 border-red-200"
+                        disabled={actionLoading === order.id}
                       >
-                        <XCircle className="h-4 w-4" />
+                        {actionLoading === order.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
                         Reject
                       </Button>
                       <Button
                         fullWidth
                         onClick={() => handleAccept(order.id)}
+                        disabled={actionLoading === order.id}
                       >
-                        <CheckCircle className="h-4 w-4" />
+                        {actionLoading === order.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
                         Accept
                       </Button>
                     </>
                   )}
                   {order.status === 'accepted' && (
-                    <Button fullWidth onClick={() => handlePickedUp(order.id)}>
-                      <Package className="h-4 w-4" />
+                    <Button
+                      fullWidth
+                      onClick={() => handlePickedUp(order.id)}
+                      disabled={actionLoading === order.id}
+                    >
+                      {actionLoading === order.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Package className="h-4 w-4" />
+                      )}
                       Picked Up
                     </Button>
                   )}
                   {order.status === 'picked_up' && (
-                    <Button fullWidth onClick={() => handleDelivered(order.id)}>
-                      <CheckCircle className="h-4 w-4" />
+                    <Button
+                      fullWidth
+                      onClick={() => handleDelivered(order.id)}
+                      disabled={actionLoading === order.id}
+                    >
+                      {actionLoading === order.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4" />
+                      )}
                       Mark Delivered
                     </Button>
                   )}

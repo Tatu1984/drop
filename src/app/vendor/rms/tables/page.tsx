@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Plus,
   Settings,
@@ -14,11 +14,13 @@ import {
   Save,
   X,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import RMSLayout from '@/components/layout/RMSLayout';
+import toast from 'react-hot-toast';
 
 interface Table {
   id: string;
@@ -55,31 +57,6 @@ interface Zone {
   color: string;
 }
 
-const mockFloors: Floor[] = [
-  {
-    id: 'f1',
-    name: 'Ground Floor',
-    tables: [
-      { id: 't1', tableNumber: 'T-01', capacity: 2, minCapacity: 1, status: 'AVAILABLE', shape: 'SQUARE', positionX: 50, positionY: 50, width: 80, height: 80, rotation: 0, floorId: 'f1' },
-      { id: 't2', tableNumber: 'T-02', capacity: 2, minCapacity: 1, status: 'OCCUPIED', shape: 'SQUARE', positionX: 150, positionY: 50, width: 80, height: 80, rotation: 0, floorId: 'f1', currentOrder: { id: 'o1', orderNumber: 'DIN-001', guestCount: 2, total: 850, duration: 45 } },
-      { id: 't3', tableNumber: 'T-03', capacity: 4, minCapacity: 2, status: 'AVAILABLE', shape: 'RECTANGLE', positionX: 250, positionY: 50, width: 120, height: 80, rotation: 0, floorId: 'f1' },
-      { id: 't4', tableNumber: 'T-04', capacity: 4, minCapacity: 2, status: 'RESERVED', shape: 'RECTANGLE', positionX: 50, positionY: 150, width: 120, height: 80, rotation: 0, floorId: 'f1' },
-      { id: 't5', tableNumber: 'T-05', capacity: 4, minCapacity: 2, status: 'OCCUPIED', shape: 'CIRCLE', positionX: 200, positionY: 150, width: 100, height: 100, rotation: 0, floorId: 'f1', currentOrder: { id: 'o2', orderNumber: 'DIN-002', guestCount: 4, total: 1650, duration: 30 } },
-      { id: 't6', tableNumber: 'T-06', capacity: 6, minCapacity: 4, status: 'CLEANING', shape: 'OVAL', positionX: 320, positionY: 150, width: 150, height: 100, rotation: 0, floorId: 'f1' },
-      { id: 't7', tableNumber: 'T-07', capacity: 6, minCapacity: 4, status: 'AVAILABLE', shape: 'RECTANGLE', positionX: 50, positionY: 280, width: 150, height: 80, rotation: 0, floorId: 'f1' },
-      { id: 't8', tableNumber: 'T-08', capacity: 8, minCapacity: 6, status: 'OCCUPIED', shape: 'RECTANGLE', positionX: 220, positionY: 280, width: 180, height: 100, rotation: 0, floorId: 'f1', currentOrder: { id: 'o3', orderNumber: 'DIN-003', guestCount: 7, total: 3200, duration: 55 } },
-    ],
-  },
-  {
-    id: 'f2',
-    name: 'Rooftop',
-    tables: [
-      { id: 't9', tableNumber: 'R-01', capacity: 2, minCapacity: 1, status: 'AVAILABLE', shape: 'CIRCLE', positionX: 50, positionY: 50, width: 80, height: 80, rotation: 0, floorId: 'f2' },
-      { id: 't10', tableNumber: 'R-02', capacity: 4, minCapacity: 2, status: 'AVAILABLE', shape: 'SQUARE', positionX: 150, positionY: 50, width: 100, height: 100, rotation: 0, floorId: 'f2' },
-    ],
-  },
-];
-
 const zones: Zone[] = [
   { id: 'z1', name: 'Window', color: '#3b82f6' },
   { id: 'z2', name: 'Patio', color: '#22c55e' },
@@ -88,12 +65,86 @@ const zones: Zone[] = [
 ];
 
 export default function TablesPage() {
-  const [floors, setFloors] = useState<Floor[]>(mockFloors);
-  const [selectedFloor, setSelectedFloor] = useState<Floor>(mockFloors[0]);
+  const [loading, setLoading] = useState(true);
+  const [floors, setFloors] = useState<Floor[]>([]);
+  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+
+  useEffect(() => {
+    fetchTablesData();
+  }, []);
+
+  const fetchTablesData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('vendor-token');
+      const outletId = localStorage.getItem('vendor-outletId');
+
+      if (!token || !outletId) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/tables?outletId=${outletId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to fetch tables');
+        return;
+      }
+
+      // Group tables by floor
+      const floorsMap: { [key: string]: Floor } = {};
+
+      result.data.data.forEach((table: any) => {
+        const floorId = table.floor?.id || 'default';
+        const floorName = table.floor?.name || 'Main Floor';
+
+        if (!floorsMap[floorId]) {
+          floorsMap[floorId] = {
+            id: floorId,
+            name: floorName,
+            tables: [],
+          };
+        }
+
+        floorsMap[floorId].tables.push({
+          id: table.id,
+          tableNumber: table.tableNumber,
+          capacity: table.capacity,
+          minCapacity: table.minCapacity || 1,
+          status: table.status,
+          shape: table.shape || 'RECTANGLE',
+          positionX: table.positionX || 0,
+          positionY: table.positionY || 0,
+          width: table.width || 100,
+          height: table.height || 80,
+          rotation: table.rotation || 0,
+          floorId: floorId,
+          zoneId: table.zone?.id,
+        });
+      });
+
+      const floorsArray = Object.values(floorsMap);
+      setFloors(floorsArray);
+      if (floorsArray.length > 0) {
+        setSelectedFloor(floorsArray[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+      toast.error('Failed to load tables');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status: Table['status']) => {
     switch (status) {
@@ -117,7 +168,7 @@ export default function TablesPage() {
     }
   };
 
-  const stats = {
+  const stats = selectedFloor ? {
     total: selectedFloor.tables.length,
     available: selectedFloor.tables.filter(t => t.status === 'AVAILABLE').length,
     occupied: selectedFloor.tables.filter(t => t.status === 'OCCUPIED').length,
@@ -125,18 +176,80 @@ export default function TablesPage() {
     cleaning: selectedFloor.tables.filter(t => t.status === 'CLEANING').length,
     totalCapacity: selectedFloor.tables.reduce((sum, t) => sum + t.capacity, 0),
     currentGuests: selectedFloor.tables.filter(t => t.currentOrder).reduce((sum, t) => sum + (t.currentOrder?.guestCount || 0), 0),
+  } : {
+    total: 0,
+    available: 0,
+    occupied: 0,
+    reserved: 0,
+    cleaning: 0,
+    totalCapacity: 0,
+    currentGuests: 0,
   };
 
-  const updateTableStatus = (tableId: string, newStatus: Table['status']) => {
-    setFloors(floors.map(floor => ({
-      ...floor,
-      tables: floor.tables.map(table =>
-        table.id === tableId ? { ...table, status: newStatus } : table
-      ),
-    })));
-    setShowStatusModal(false);
-    setSelectedTable(null);
+  const updateTableStatus = async (tableId: string, newStatus: Table['status']) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/tables/${tableId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to update table status');
+        return;
+      }
+
+      // Update local state
+      setFloors(floors.map(floor => ({
+        ...floor,
+        tables: floor.tables.map(table =>
+          table.id === tableId ? { ...table, status: newStatus } : table
+        ),
+      })));
+
+      toast.success('Table status updated');
+      setShowStatusModal(false);
+      setSelectedTable(null);
+    } catch (error) {
+      console.error('Error updating table status:', error);
+      toast.error('Failed to update table status');
+    }
   };
+
+  if (loading) {
+    return (
+      <RMSLayout title="Floor Plan" subtitle="Loading...">
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      </RMSLayout>
+    );
+  }
+
+  if (!selectedFloor) {
+    return (
+      <RMSLayout title="Floor Plan" subtitle="No floors configured">
+        <div className="flex flex-col items-center justify-center h-96 text-gray-500">
+          <p className="text-lg mb-4">No floors or tables found</p>
+          <Button onClick={() => setShowTableModal(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Table
+          </Button>
+        </div>
+      </RMSLayout>
+    );
+  }
 
   return (
     <RMSLayout

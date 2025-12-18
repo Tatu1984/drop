@@ -71,41 +71,90 @@ export default function VerifyOTPPage() {
   };
 
   const handleVerify = async (otpValue: string) => {
-    setIsLoading(true);
-
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // For demo, accept any 6-digit OTP
-    if (otpValue.length === 6) {
-      // Create mock user
-      setUser({
-        id: 'user-1',
-        phone: phone,
-        name: 'User',
-        isKycVerified: false,
-        isAgeVerified: false,
-        preferredLanguage: 'en',
-        cuisinePreferences: [],
-        groceryBrands: [],
-        alcoholPreferences: [],
-      });
-      toast.success('Login successful!');
-      router.push('/');
-    } else {
-      toast.error('Invalid OTP');
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+    if (otpValue.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
     }
 
-    setIsLoading(false);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, otp: otpValue, type: 'user' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP');
+      }
+
+      // Store token in localStorage for API calls
+      if (data.data?.token) {
+        localStorage.setItem('auth-token', data.data.token);
+      }
+
+      // Set user in store
+      if (data.data?.user) {
+        setUser({
+          id: data.data.user.id,
+          phone: data.data.user.phone,
+          name: data.data.user.name || 'User',
+          email: data.data.user.email,
+          avatar: data.data.user.avatar,
+          isKycVerified: data.data.user.isKycVerified,
+          isAgeVerified: data.data.user.isAgeVerified,
+          preferredLanguage: 'en',
+          cuisinePreferences: [],
+          groceryBrands: [],
+          alcoholPreferences: [],
+          wallet: data.data.user.wallet,
+          loyaltyPoints: data.data.user.loyaltyPoints,
+          addresses: data.data.user.addresses,
+        });
+      }
+
+      toast.success(data.data?.isNewUser ? 'Welcome to Drop!' : 'Welcome back!');
+      router.push('/');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Verification failed';
+      toast.error(message);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResend = async () => {
     if (resendTimer > 0) return;
 
-    setResendTimer(30);
-    toast.success('OTP resent successfully!');
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, type: 'user' }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend OTP');
+      }
+
+      setResendTimer(30);
+      toast.success('OTP resent successfully!');
+
+      // In development, show OTP for testing
+      if (data.data?.otp) {
+        toast(`Dev OTP: ${data.data.otp}`, { icon: '🔑', duration: 10000 });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to resend OTP';
+      toast.error(message);
+    }
   };
 
   return (

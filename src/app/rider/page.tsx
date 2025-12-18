@@ -24,6 +24,7 @@ import {
   Settings,
   HelpCircle,
   X,
+  Loader2,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -42,41 +43,44 @@ const MapComponent = dynamic(() => import('@/components/map/MapComponent'), {
   ),
 });
 
-const mockOrder = {
-  id: 'order-1',
-  orderNumber: 'ORD-ABC123',
+interface Order {
+  id: string;
+  orderNumber: string;
   restaurant: {
-    name: 'Biryani Blues',
-    address: '123, MG Road, Bangalore',
-    lat: 12.9716,
-    lng: 77.5946,
-    phone: '9876543210',
-  },
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    phone: string;
+  };
   customer: {
-    name: 'John Doe',
-    address: '456, Indiranagar, Bangalore',
-    lat: 12.98,
-    lng: 77.60,
-    phone: '9876543211',
-  },
-  items: ['2x Hyderabadi Chicken Biryani', '1x Mirchi ka Salan'],
-  total: 647,
-  paymentMethod: 'Online Paid',
-  distance: 3.5,
-  earnings: 45,
-};
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    phone: string;
+  };
+  items: string[];
+  total: number;
+  paymentMethod: string;
+  distance: number;
+  earnings: number;
+  status: string;
+}
 
 export default function RiderDashboard() {
   const router = useRouter();
   const { riderUser, logoutRider } = useAuthStore();
   const [isOnline, setIsOnline] = useState(false);
-  const [currentOrder, setCurrentOrder] = useState<typeof mockOrder | null>(null);
+  const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderStatus, setOrderStatus] = useState<'pickup' | 'delivering' | 'completed'>('pickup');
   const [riderLocation, setRiderLocation] = useState<[number, number]>([12.9716, 77.5946]);
   const [todayEarnings, setTodayEarnings] = useState(0);
   const [todayDeliveries, setTodayDeliveries] = useState(0);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showSOSModal, setShowSOSModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -84,6 +88,98 @@ export default function RiderDashboard() {
       router.push('/rider/login');
     }
   }, [riderUser, router]);
+
+  // Fetch active orders
+  const fetchOrders = async () => {
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      const response = await fetch('/api/rider/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data?.orders) {
+        // Find active order (accepted or picked_up status)
+        const activeOrder = data.data.orders.find(
+          (order: any) => order.status === 'accepted' || order.status === 'picked_up'
+        );
+
+        if (activeOrder) {
+          setCurrentOrder(activeOrder);
+          setOrderStatus(activeOrder.status === 'picked_up' ? 'delivering' : 'pickup');
+        }
+
+        // Calculate today's stats
+        const today = new Date().toDateString();
+        const todayOrders = data.data.orders.filter(
+          (order: any) => new Date(order.createdAt).toDateString() === today
+        );
+        const deliveredToday = todayOrders.filter((order: any) => order.status === 'delivered');
+
+        setTodayDeliveries(deliveredToday.length);
+        setTodayEarnings(deliveredToday.reduce((sum: number, order: any) => sum + (order.earnings || 0), 0));
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  // Update location
+  const updateLocation = async (lat: number, lng: number) => {
+    if (!isOnline) return;
+
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      await fetch('/api/rider/location', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          latitude: lat,
+          longitude: lng,
+        }),
+      });
+    } catch (error) {
+      console.error('Error updating location:', error);
+    }
+  };
+
+  // Get current location and update
+  useEffect(() => {
+    if (isOnline && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation: [number, number] = [
+            position.coords.latitude,
+            position.coords.longitude,
+          ];
+          setRiderLocation(newLocation);
+          updateLocation(newLocation[0], newLocation[1]);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+        }
+      );
+    }
+  }, [isOnline]);
+
+  // Fetch orders periodically when online
+  useEffect(() => {
+    if (isOnline) {
+      fetchOrders();
+      const interval = setInterval(fetchOrders, 10000); // Poll every 10 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isOnline]);
 
   const handleLogout = () => {
     logoutRider();
@@ -99,55 +195,159 @@ export default function RiderDashboard() {
     setShowSOSModal(false);
   };
 
-  // Simulate location updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isOnline) {
-        setRiderLocation((prev) => [
-          prev[0] + (Math.random() - 0.5) * 0.001,
-          prev[1] + (Math.random() - 0.5) * 0.001,
-        ]);
+  const handleToggleOnline = async () => {
+    setIsUpdatingLocation(true);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      const newStatus = !isOnline;
+
+      const response = await fetch('/api/rider/location', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          latitude: riderLocation[0],
+          longitude: riderLocation[1],
+          online: newStatus,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsOnline(newStatus);
+        toast.success(newStatus ? 'You are now online' : 'You are now offline');
+      } else {
+        toast.error(data.error || 'Failed to update status');
       }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isOnline]);
-
-  // Simulate incoming order
-  useEffect(() => {
-    if (isOnline && !currentOrder) {
-      const timer = setTimeout(() => {
-        setCurrentOrder(mockOrder);
-        toast.success('New order received!');
-      }, 3000);
-      return () => clearTimeout(timer);
+    } catch (error) {
+      console.error('Error updating online status:', error);
+      toast.error('Failed to update status');
+    } finally {
+      setIsUpdatingLocation(false);
     }
-  }, [isOnline, currentOrder]);
-
-  const handleToggleOnline = () => {
-    setIsOnline(!isOnline);
-    toast.success(isOnline ? 'You are now offline' : 'You are now online');
   };
 
-  const handleAcceptOrder = () => {
-    toast.success('Order accepted! Navigate to pickup location');
+  const handleAcceptOrder = async () => {
+    if (!currentOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      const response = await fetch('/api/rider/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: currentOrder.id,
+          action: 'accept',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Order accepted! Navigate to pickup location');
+        fetchOrders(); // Refresh orders
+      } else {
+        toast.error(data.error || 'Failed to accept order');
+      }
+    } catch (error) {
+      console.error('Error accepting order:', error);
+      toast.error('Failed to accept order');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handlePickedUp = () => {
-    setOrderStatus('delivering');
-    toast.success('Order picked up! Navigate to customer');
+  const handlePickedUp = async () => {
+    if (!currentOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      const response = await fetch('/api/rider/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: currentOrder.id,
+          action: 'pickup',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOrderStatus('delivering');
+        toast.success('Order picked up! Navigate to customer');
+        fetchOrders(); // Refresh orders
+      } else {
+        toast.error(data.error || 'Failed to update order');
+      }
+    } catch (error) {
+      console.error('Error updating order:', error);
+      toast.error('Failed to update order');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDelivered = () => {
-    setOrderStatus('completed');
-    setTodayEarnings((prev) => prev + (currentOrder?.earnings || 0));
-    setTodayDeliveries((prev) => prev + 1);
-    toast.success('Order delivered! Great job!');
+  const handleDelivered = async () => {
+    if (!currentOrder) return;
 
-    // Reset after 2 seconds
-    setTimeout(() => {
-      setCurrentOrder(null);
-      setOrderStatus('pickup');
-    }, 2000);
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('rider-token');
+      if (!token) return;
+
+      const response = await fetch('/api/rider/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          orderId: currentOrder.id,
+          action: 'deliver',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOrderStatus('completed');
+        setTodayEarnings((prev) => prev + (currentOrder?.earnings || 0));
+        setTodayDeliveries((prev) => prev + 1);
+        toast.success('Order delivered! Great job!');
+
+        // Reset after 2 seconds
+        setTimeout(() => {
+          setCurrentOrder(null);
+          setOrderStatus('pickup');
+          fetchOrders(); // Refresh orders
+        }, 2000);
+      } else {
+        toast.error(data.error || 'Failed to mark as delivered');
+      }
+    } catch (error) {
+      console.error('Error marking order as delivered:', error);
+      toast.error('Failed to mark as delivered');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const destination = orderStatus === 'pickup'

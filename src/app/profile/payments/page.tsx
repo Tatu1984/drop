@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Plus, CreditCard, Smartphone, Building2, Trash2, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, Plus, CreditCard, Smartphone, Building2, Trash2, Check, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -19,30 +19,6 @@ interface PaymentMethod {
   icon?: string;
 }
 
-const initialPayments: PaymentMethod[] = [
-  {
-    id: '1',
-    type: 'card',
-    name: 'HDFC Credit Card',
-    details: '**** **** **** 4532',
-    isDefault: true,
-  },
-  {
-    id: '2',
-    type: 'upi',
-    name: 'Google Pay',
-    details: 'user@okicici',
-    isDefault: false,
-  },
-  {
-    id: '3',
-    type: 'netbanking',
-    name: 'ICICI Bank',
-    details: 'Net Banking',
-    isDefault: false,
-  },
-];
-
 const banks = [
   { id: 'hdfc', name: 'HDFC Bank' },
   { id: 'icici', name: 'ICICI Bank' },
@@ -52,9 +28,11 @@ const banks = [
 ];
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<PaymentMethod[]>(initialPayments);
+  const [payments, setPayments] = useState<PaymentMethod[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addType, setAddType] = useState<'card' | 'upi' | 'netbanking'>('card');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     cardNumber: '',
     cardName: '',
@@ -63,6 +41,40 @@ export default function PaymentsPage() {
     upiId: '',
     bankId: '',
   });
+
+  useEffect(() => {
+    fetchPaymentMethods();
+  }, []);
+
+  const fetchPaymentMethods = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/payment-methods', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setPayments(data.data || []);
+      } else {
+        toast.error(data.error || 'Failed to fetch payment methods');
+      }
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
+      toast.error('Failed to load payment methods');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -77,66 +89,142 @@ export default function PaymentsPage() {
     }
   };
 
-  const handleSave = () => {
-    let newPayment: PaymentMethod;
+  const handleSave = async () => {
+    let paymentData: any;
 
     if (addType === 'card') {
       if (!formData.cardNumber || !formData.cardName) {
         toast.error('Please fill all card details');
         return;
       }
-      newPayment = {
-        id: Date.now().toString(),
+      paymentData = {
         type: 'card',
         name: formData.cardName,
-        details: `**** **** **** ${formData.cardNumber.slice(-4)}`,
-        isDefault: payments.length === 0,
+        cardNumber: formData.cardNumber,
+        expiry: formData.expiry,
+        cvv: formData.cvv,
       };
     } else if (addType === 'upi') {
       if (!formData.upiId) {
         toast.error('Please enter UPI ID');
         return;
       }
-      newPayment = {
-        id: Date.now().toString(),
+      paymentData = {
         type: 'upi',
-        name: 'UPI',
-        details: formData.upiId,
-        isDefault: payments.length === 0,
+        upiId: formData.upiId,
       };
     } else {
       if (!formData.bankId) {
         toast.error('Please select a bank');
         return;
       }
-      const bank = banks.find(b => b.id === formData.bankId);
-      newPayment = {
-        id: Date.now().toString(),
+      paymentData = {
         type: 'netbanking',
-        name: bank?.name || 'Bank',
-        details: 'Net Banking',
-        isDefault: payments.length === 0,
+        bankId: formData.bankId,
       };
     }
 
-    setPayments([...payments, newPayment]);
-    toast.success('Payment method added');
-    setShowAddModal(false);
-    setFormData({ cardNumber: '', cardName: '', expiry: '', cvv: '', upiId: '', bankId: '' });
+    try {
+      setSaving(true);
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        setSaving(false);
+        return;
+      }
+
+      const response = await fetch('/api/user/payment-methods', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Payment method added');
+        setShowAddModal(false);
+        setFormData({ cardNumber: '', cardName: '', expiry: '', cvv: '', upiId: '', bankId: '' });
+        fetchPaymentMethods();
+      } else {
+        toast.error(data.error || 'Failed to add payment method');
+      }
+    } catch (error) {
+      console.error('Error adding payment method:', error);
+      toast.error('Failed to add payment method');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setPayments(payments.filter(p => p.id !== id));
-    toast.success('Payment method removed');
+  const handleDelete = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/payment-methods/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Payment method removed');
+        fetchPaymentMethods();
+      } else {
+        toast.error(data.error || 'Failed to remove payment method');
+      }
+    } catch (error) {
+      console.error('Error deleting payment method:', error);
+      toast.error('Failed to remove payment method');
+    }
   };
 
-  const handleSetDefault = (id: string) => {
-    setPayments(payments.map(p => ({
-      ...p,
-      isDefault: p.id === id,
-    })));
-    toast.success('Default payment method updated');
+  const handleSetDefault = async (id: string) => {
+    try {
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const response = await fetch(`/api/user/payment-methods/${id}/default`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Default payment method updated');
+        fetchPaymentMethods();
+      } else {
+        toast.error(data.error || 'Failed to update default payment method');
+      }
+    } catch (error) {
+      console.error('Error setting default payment method:', error);
+      toast.error('Failed to update default payment method');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -303,7 +391,7 @@ export default function PaymentsPage() {
             </div>
           )}
 
-          <Button fullWidth onClick={handleSave}>
+          <Button fullWidth onClick={handleSave} loading={saving}>
             Add Payment Method
           </Button>
         </div>

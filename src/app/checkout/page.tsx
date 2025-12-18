@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, MapPin, Clock, CreditCard, Wallet, Tag, ChevronRight, Check, Plus, Users, Store, Download, FileText, Share2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { ArrowLeft, MapPin, Clock, CreditCard, Wallet, Tag, ChevronRight, Check, Plus, Users, Store, Download, FileText, Share2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCartStore, useLocationStore, useWalletStore } from '@/store/useStore';
@@ -13,16 +13,27 @@ import Badge from '@/components/ui/Badge';
 import { formatCurrency } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-const paymentMethods = [
-  { id: 'wallet', name: 'Drop Wallet', icon: Wallet, balance: 1250 },
-  { id: 'card', name: 'Credit/Debit Card', icon: CreditCard, details: '**** 4532' },
-  { id: 'upi', name: 'UPI', icon: CreditCard, details: 'Pay via any UPI app' },
-  { id: 'cod', name: 'Cash on Delivery', icon: CreditCard, details: 'Pay when delivered' },
-];
+interface Address {
+  id: string;
+  label: string;
+  fullAddress: string;
+  isDefault: boolean;
+}
 
-const savedAddresses = [
-  { id: '1', type: 'home', label: 'Home', address: '123 MG Road, Indiranagar, Bangalore 560038' },
-  { id: '2', type: 'work', label: 'Office', address: '456 Koramangala 4th Block, Bangalore 560034' },
+interface Coupon {
+  code: string;
+  discountType: string;
+  discountValue: number;
+  minOrderValue: number;
+  maxDiscount?: number;
+  description?: string;
+}
+
+const paymentMethods = [
+  { id: 'WALLET', name: 'Drop Wallet', icon: Wallet, balance: 0 },
+  { id: 'CARD', name: 'Credit/Debit Card', icon: CreditCard, details: '**** 4532' },
+  { id: 'UPI', name: 'UPI', icon: CreditCard, details: 'Pay via any UPI app' },
+  { id: 'COD', name: 'Cash on Delivery', icon: CreditCard, details: 'Pay when delivered' },
 ];
 
 const deliverySlots = [
@@ -31,27 +42,25 @@ const deliverySlots = [
   { id: '3', label: 'Scheduled', time: 'Choose time', price: 0 },
 ];
 
-const coupons = [
-  { code: 'FIRST50', discount: 50, minOrder: 200, description: '50% off up to ₹50' },
-  { code: 'FREE20', discount: 20, minOrder: 100, description: 'Flat ₹20 off' },
-];
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, getSubtotal, clearCart } = useCartStore();
   const { selectedAddress: storeAddress } = useLocationStore();
   const { wallet } = useWalletStore();
 
-  const [selectedAddress, setSelectedAddress] = useState(savedAddresses[0]);
-  const [selectedPayment, setSelectedPayment] = useState('wallet');
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState('COD');
   const [selectedSlot, setSelectedSlot] = useState(deliverySlots[0]);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<typeof coupons[0] | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [showSplitBillModal, setShowSplitBillModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [tip, setTip] = useState(0);
   const [isSelfPickup, setIsSelfPickup] = useState(false);
   const [splitBillMode, setSplitBillMode] = useState<'none' | 'equal' | 'custom'>('none');
@@ -63,24 +72,77 @@ export default function CheckoutPage() {
   const [needGSTInvoice, setNeedGSTInvoice] = useState(false);
   const [gstNumber, setGstNumber] = useState('');
 
+  // Fetch addresses and coupons on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('auth-token');
+
+        // Fetch addresses
+        const addressRes = await fetch('/api/user/addresses', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (addressRes.ok) {
+          const addressData = await addressRes.json();
+          const addresses = addressData.data || [];
+          setSavedAddresses(addresses);
+          const defaultAddr = addresses.find((a: Address) => a.isDefault) || addresses[0];
+          if (defaultAddr) setSelectedAddress(defaultAddr);
+        }
+
+        // Fetch available coupons
+        const couponRes = await fetch('/api/admin/marketing/coupons?active=true');
+        if (couponRes.ok) {
+          const couponData = await couponRes.json();
+          setAvailableCoupons(couponData.data?.data || []);
+        }
+
+        // Update wallet balance in payment methods
+        if (wallet?.balance) {
+          paymentMethods[0].balance = wallet.balance;
+        }
+      } catch (error) {
+        console.error('Error loading checkout data:', error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, [wallet?.balance]);
+
   const subtotal = getSubtotal();
   const deliveryFee = isSelfPickup ? 0 : selectedSlot.price;
-  const discount = appliedCoupon ? Math.min(appliedCoupon.discount, subtotal * 0.5) : 0;
+
+  // Calculate discount based on coupon type
+  const calculateDiscount = () => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.discountType === 'PERCENTAGE') {
+      const disc = Math.round(subtotal * appliedCoupon.discountValue / 100);
+      return appliedCoupon.maxDiscount ? Math.min(disc, appliedCoupon.maxDiscount) : disc;
+    }
+    return appliedCoupon.discountValue;
+  };
+  const discount = calculateDiscount();
   const taxes = Math.round(subtotal * 0.05);
   const total = subtotal + deliveryFee + taxes + tip - discount;
   const yourShare = splitBillMode === 'equal' && splitWith.length > 0
     ? Math.ceil(total / (splitWith.length + 1))
     : total;
 
-  const applyCoupon = () => {
-    const coupon = coupons.find(c => c.code.toLowerCase() === couponCode.toLowerCase());
+  const applyCoupon = async () => {
+    // First check in available coupons
+    const coupon = availableCoupons.find(c => c.code.toLowerCase() === couponCode.toLowerCase());
     if (coupon) {
-      if (subtotal >= coupon.minOrder) {
+      if (subtotal >= coupon.minOrderValue) {
         setAppliedCoupon(coupon);
-        toast.success(`Coupon applied! You saved ₹${coupon.discount}`);
+        const savedAmount = coupon.discountType === 'PERCENTAGE'
+          ? Math.min(Math.round(subtotal * coupon.discountValue / 100), coupon.maxDiscount || Infinity)
+          : coupon.discountValue;
+        toast.success(`Coupon applied! You saved ₹${savedAmount}`);
         setShowCouponModal(false);
       } else {
-        toast.error(`Minimum order ₹${coupon.minOrder} required`);
+        toast.error(`Minimum order ₹${coupon.minOrderValue} required`);
       }
     } else {
       toast.error('Invalid coupon code');
@@ -88,12 +150,71 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
+    if (!selectedAddress && !isSelfPickup) {
+      toast.error('Please select a delivery address');
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    clearCart();
-    toast.success('Order placed successfully!');
-    router.push('/orders/ORD123/track');
+    try {
+      const token = localStorage.getItem('auth-token');
+
+      // Get vendor ID from first item (assuming single-vendor cart)
+      const vendorId = items[0]?.product?.vendorId;
+      if (!vendorId) {
+        throw new Error('Invalid cart items');
+      }
+
+      const orderData = {
+        vendorId,
+        addressId: isSelfPickup ? null : selectedAddress?.id,
+        items: items.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          customizations: item.customizations || null,
+        })),
+        paymentMethod: selectedPayment,
+        tip,
+        couponCode: appliedCoupon?.code || null,
+        deliveryInstructions: '',
+      };
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to place order');
+      }
+
+      clearCart();
+      toast.success('Order placed successfully!');
+
+      // Navigate to order tracking page
+      const orderId = data.data?.order?.id;
+      if (orderId) {
+        router.push(`/orders/${orderId}/track`);
+      } else {
+        router.push('/orders');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to place order';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (items.length === 0) {
@@ -126,13 +247,19 @@ export default function CheckoutPage() {
           >
             <MapPin className="h-5 w-5 text-orange-500 mt-0.5" />
             <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-gray-900">
-                  Deliver to {selectedAddress.label}
-                </span>
-                <Badge variant="default" size="sm">{selectedAddress.type}</Badge>
-              </div>
-              <p className="text-sm text-gray-500 mt-1">{selectedAddress.address}</p>
+              {selectedAddress ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">
+                      Deliver to {selectedAddress.label}
+                    </span>
+                    {selectedAddress.isDefault && <Badge variant="default" size="sm">Default</Badge>}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{selectedAddress.fullAddress}</p>
+                </>
+              ) : (
+                <span className="text-gray-500">Select delivery address</span>
+              )}
             </div>
             <ChevronRight className="h-5 w-5 text-gray-400" />
           </button>
@@ -373,28 +500,35 @@ export default function CheckoutPage() {
         title="Select Delivery Address"
       >
         <div className="space-y-3">
-          {savedAddresses.map((address) => (
-            <button
-              key={address.id}
-              onClick={() => {
-                setSelectedAddress(address);
-                setShowAddressModal(false);
-              }}
-              className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                selectedAddress.id === address.id
-                  ? 'border-orange-500 bg-orange-50'
-                  : 'border-gray-200'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{address.label}</span>
-                {selectedAddress.id === address.id && (
-                  <Check className="h-4 w-4 text-orange-500" />
-                )}
-              </div>
-              <p className="text-sm text-gray-500 mt-1">{address.address}</p>
-            </button>
-          ))}
+          {savedAddresses.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No saved addresses</p>
+          ) : (
+            savedAddresses.map((address) => (
+              <button
+                key={address.id}
+                onClick={() => {
+                  setSelectedAddress(address);
+                  setShowAddressModal(false);
+                }}
+                className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                  selectedAddress?.id === address.id
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{address.label}</span>
+                  {selectedAddress?.id === address.id && (
+                    <Check className="h-4 w-4 text-orange-500" />
+                  )}
+                  {address.isDefault && (
+                    <Badge variant="default" size="sm">Default</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{address.fullAddress}</p>
+              </button>
+            ))
+          )}
           <Link href="/profile/addresses">
             <Button variant="outline" fullWidth>
               <Plus className="h-4 w-4" />
@@ -460,20 +594,27 @@ export default function CheckoutPage() {
           </div>
           <div className="space-y-3">
             <p className="text-sm font-medium text-gray-500">Available Coupons</p>
-            {coupons.map((coupon) => (
-              <button
-                key={coupon.code}
-                onClick={() => {
-                  setCouponCode(coupon.code);
-                  applyCoupon();
-                }}
-                className="w-full p-3 rounded-lg border border-dashed border-orange-300 bg-orange-50 text-left"
-              >
-                <p className="font-bold text-orange-600">{coupon.code}</p>
-                <p className="text-sm text-gray-600">{coupon.description}</p>
-                <p className="text-xs text-gray-400 mt-1">Min. order ₹{coupon.minOrder}</p>
-              </button>
-            ))}
+            {availableCoupons.length === 0 ? (
+              <p className="text-gray-400 text-sm text-center py-2">No coupons available</p>
+            ) : (
+              availableCoupons.map((coupon) => (
+                <button
+                  key={coupon.code}
+                  onClick={() => {
+                    setCouponCode(coupon.code);
+                  }}
+                  className="w-full p-3 rounded-lg border border-dashed border-orange-300 bg-orange-50 text-left"
+                >
+                  <p className="font-bold text-orange-600">{coupon.code}</p>
+                  <p className="text-sm text-gray-600">
+                    {coupon.discountType === 'PERCENTAGE'
+                      ? `${coupon.discountValue}% off${coupon.maxDiscount ? ` up to ₹${coupon.maxDiscount}` : ''}`
+                      : `Flat ₹${coupon.discountValue} off`}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Min. order ₹{coupon.minOrderValue}</p>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </Modal>

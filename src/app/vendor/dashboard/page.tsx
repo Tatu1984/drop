@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Package, DollarSign, TrendingUp, Clock, Star, AlertTriangle, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Package, DollarSign, TrendingUp, Clock, Star, AlertTriangle, CheckCircle, XCircle, ChevronRight, Loader2 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -14,46 +14,142 @@ interface Order {
   customerName: string;
   items: { name: string; qty: number }[];
   total: number;
-  status: 'new' | 'preparing' | 'ready' | 'picked_up';
+  status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'READY' | 'PICKED_UP' | 'DELIVERED';
   time: string;
+  createdAt: string;
 }
 
-const mockOrders: Order[] = [
-  { id: '1', orderNumber: '#DRP001234', customerName: 'Rahul S.', items: [{ name: 'Butter Chicken', qty: 2 }, { name: 'Naan', qty: 4 }], total: 650, status: 'new', time: '2 mins ago' },
-  { id: '2', orderNumber: '#DRP001235', customerName: 'Priya M.', items: [{ name: 'Paneer Tikka', qty: 1 }, { name: 'Dal Makhani', qty: 1 }], total: 420, status: 'preparing', time: '8 mins ago' },
-  { id: '3', orderNumber: '#DRP001236', customerName: 'Amit K.', items: [{ name: 'Biryani', qty: 3 }], total: 750, status: 'ready', time: '15 mins ago' },
-];
-
-const stats = {
-  todayOrders: 45,
-  todayRevenue: 28500,
-  avgRating: 4.6,
-  avgPrepTime: 22,
-  pendingOrders: 5,
-  completedOrders: 40,
-};
+interface Stats {
+  todayOrders: number;
+  ordersChange: number;
+  todayRevenue: number;
+  revenueChange: number;
+  avgRating: number;
+  totalRatings: number;
+  avgPrepTime: number;
+  pendingOrders: number;
+  preparingOrders: number;
+  completedOrders: number;
+}
 
 export default function VendorDashboardPage() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const updateOrderStatus = (orderId: string, newStatus: Order['status']) => {
-    setOrders(orders.map(order => {
-      if (order.id === orderId) {
-        toast.success(`Order ${order.orderNumber} marked as ${newStatus.replace('_', ' ')}`);
-        return { ...order, status: newStatus };
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('vendor-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
       }
-      return order;
-    }));
+
+      // Fetch stats and recent orders in parallel
+      const [statsResponse, ordersResponse] = await Promise.all([
+        fetch('/api/vendor/stats', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+        fetch('/api/vendor/orders?limit=5', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        }),
+      ]);
+
+      const statsData = await statsResponse.json();
+      const ordersData = await ordersResponse.json();
+
+      if (statsData.success) {
+        setStats(statsData.data);
+      }
+
+      if (ordersData.success && ordersData.data.items) {
+        // Transform orders to match UI format
+        const transformedOrders = ordersData.data.items.map((order: any) => ({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.user?.name || 'Unknown',
+          items: order.items?.map((item: any) => ({
+            name: item.product?.name || 'Item',
+            qty: item.quantity,
+          })) || [],
+          total: order.total,
+          status: order.status,
+          createdAt: order.createdAt,
+          time: getTimeAgo(new Date(order.createdAt)),
+        }));
+        setOrders(transformedOrders);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getTimeAgo = (date: Date) => {
+    const diff = Date.now() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m ago`;
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+      const response = await fetch('/api/vendor/orders', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
+        fetchDashboardData(); // Refresh data
+      } else {
+        toast.error(data.error || 'Failed to update order');
+      }
+    } catch (error) {
+      console.error('Failed to update order:', error);
+      toast.error('Failed to update order status');
+    }
   };
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
-      case 'new': return 'bg-red-100 text-red-700 border-red-200';
-      case 'preparing': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'ready': return 'bg-green-100 text-green-700 border-green-200';
-      case 'picked_up': return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'PENDING':
+      case 'CONFIRMED':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'PREPARING': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'READY':
+      case 'READY_FOR_PICKUP':
+        return 'bg-green-100 text-green-700 border-green-200';
+      case 'PICKED_UP':
+      case 'DELIVERED':
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
+
+  if (isLoading) {
+    return (
+      <VendorLayout title="Dashboard">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        </div>
+      </VendorLayout>
+    );
+  }
 
   return (
     <VendorLayout title="Dashboard">
@@ -64,8 +160,10 @@ export default function VendorDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Today&apos;s Orders</p>
-                <p className="text-2xl font-bold">{stats.todayOrders}</p>
-                <p className="text-xs text-green-600">+12% vs yesterday</p>
+                <p className="text-2xl font-bold">{stats?.todayOrders || 0}</p>
+                <p className={`text-xs ${stats && stats.ordersChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats && stats.ordersChange >= 0 ? '+' : ''}{stats?.ordersChange.toFixed(1) || 0}% vs yesterday
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Package className="h-6 w-6 text-blue-600" />
@@ -76,8 +174,10 @@ export default function VendorDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Today&apos;s Revenue</p>
-                <p className="text-2xl font-bold">₹{stats.todayRevenue.toLocaleString()}</p>
-                <p className="text-xs text-green-600">+8% vs yesterday</p>
+                <p className="text-2xl font-bold">₹{stats?.todayRevenue.toLocaleString() || 0}</p>
+                <p className={`text-xs ${stats && stats.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats && stats.revenueChange >= 0 ? '+' : ''}{stats?.revenueChange.toFixed(1) || 0}% vs yesterday
+                </p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-green-600" />
@@ -88,8 +188,8 @@ export default function VendorDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Avg Rating</p>
-                <p className="text-2xl font-bold">{stats.avgRating}</p>
-                <p className="text-xs text-gray-500">Last 30 days</p>
+                <p className="text-2xl font-bold">{stats?.avgRating.toFixed(1) || 0}</p>
+                <p className="text-xs text-gray-500">{stats?.totalRatings || 0} ratings</p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
                 <Star className="h-6 w-6 text-yellow-600" />
@@ -100,8 +200,8 @@ export default function VendorDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Avg Prep Time</p>
-                <p className="text-2xl font-bold">{stats.avgPrepTime} min</p>
-                <p className="text-xs text-green-600">-3 mins vs avg</p>
+                <p className="text-2xl font-bold">{stats?.avgPrepTime || 0} min</p>
+                <p className="text-xs text-gray-500">Last 30 days</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-purple-600" />
@@ -116,7 +216,7 @@ export default function VendorDashboardPage() {
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-red-500" />
               <div>
-                <p className="text-2xl font-bold text-red-700">{stats.pendingOrders}</p>
+                <p className="text-2xl font-bold text-red-700">{stats?.pendingOrders || 0}</p>
                 <p className="text-sm text-red-600">Orders need attention</p>
               </div>
             </div>
@@ -125,7 +225,7 @@ export default function VendorDashboardPage() {
             <div className="flex items-center gap-3">
               <Clock className="h-8 w-8 text-yellow-500" />
               <div>
-                <p className="text-2xl font-bold text-yellow-700">3</p>
+                <p className="text-2xl font-bold text-yellow-700">{stats?.preparingOrders || 0}</p>
                 <p className="text-sm text-yellow-600">Being prepared</p>
               </div>
             </div>
@@ -134,7 +234,7 @@ export default function VendorDashboardPage() {
             <div className="flex items-center gap-3">
               <CheckCircle className="h-8 w-8 text-green-500" />
               <div>
-                <p className="text-2xl font-bold text-green-700">{stats.completedOrders}</p>
+                <p className="text-2xl font-bold text-green-700">{stats?.completedOrders || 0}</p>
                 <p className="text-sm text-green-600">Completed today</p>
               </div>
             </div>
@@ -170,22 +270,22 @@ export default function VendorDashboardPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    {order.status === 'new' && (
+                    {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
                       <>
-                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'preparing')}>
+                        <Button size="sm" onClick={() => updateOrderStatus(order.id, 'PREPARING')}>
                           Accept
                         </Button>
-                        <Button variant="outline" size="sm" className="text-red-600 border-red-200">
+                        <Button variant="outline" size="sm" className="text-red-600 border-red-200" onClick={() => updateOrderStatus(order.id, 'CANCELLED')}>
                           Reject
                         </Button>
                       </>
                     )}
-                    {order.status === 'preparing' && (
-                      <Button size="sm" onClick={() => updateOrderStatus(order.id, 'ready')}>
+                    {order.status === 'PREPARING' && (
+                      <Button size="sm" onClick={() => updateOrderStatus(order.id, 'READY_FOR_PICKUP')}>
                         Mark Ready
                       </Button>
                     )}
-                    {order.status === 'ready' && (
+                    {(order.status === 'READY' || order.status === 'READY_FOR_PICKUP') && (
                       <Button variant="outline" size="sm" disabled>
                         Waiting for pickup
                       </Button>

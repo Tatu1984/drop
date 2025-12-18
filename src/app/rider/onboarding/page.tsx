@@ -43,9 +43,29 @@ export default function RiderOnboardingPage() {
 
   const handleSubmit = async () => {
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    toast.success('Application submitted! We\'ll review and get back to you.');
-    router.push('/rider');
+    try {
+      const response = await fetch('/api/rider/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Application submitted! We\'ll review and get back to you.');
+        router.push('/rider/login');
+      } else {
+        toast.error(data.error || 'Failed to submit application');
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      toast.error('Failed to submit application. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

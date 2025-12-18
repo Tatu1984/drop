@@ -14,11 +14,13 @@ import {
   CalendarDays,
   ArrowRight,
   Package,
+  Loader2,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import RMSLayout from '@/components/layout/RMSLayout';
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 
 interface DashboardStats {
   todayRevenue: number;
@@ -49,30 +51,104 @@ interface KitchenAlert {
   time: string;
 }
 
+interface TopItem {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
 export default function RMSDashboardPage() {
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats>({
-    todayRevenue: 45680,
-    todayCovers: 128,
-    avgCheck: 357,
-    tableOccupancy: 72,
-    openOrders: 8,
-    kitchenQueue: 12,
-    upcomingReservations: 15,
+    todayRevenue: 0,
+    todayCovers: 0,
+    avgCheck: 0,
+    tableOccupancy: 0,
+    openOrders: 0,
+    kitchenQueue: 0,
+    upcomingReservations: 0,
     avgPrepTime: 18,
   });
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [topItems, setTopItems] = useState<TopItem[]>([]);
+  const [hourlySales, setHourlySales] = useState<{ hour: string; sales: number }[]>([]);
+  const [salesGrowth, setSalesGrowth] = useState(0);
 
-  const [recentOrders] = useState<RecentOrder[]>([
-    { id: '1', orderNumber: 'DIN-001', tableNumber: 'T-05', items: 4, total: 1250, status: 'PREPARING', time: '5 min' },
-    { id: '2', orderNumber: 'DIN-002', tableNumber: 'T-12', items: 2, total: 680, status: 'READY', time: '12 min' },
-    { id: '3', orderNumber: 'DIN-003', tableNumber: 'T-08', items: 6, total: 2100, status: 'SERVED', time: '25 min' },
-    { id: '4', orderNumber: 'DIN-004', tableNumber: 'T-03', items: 3, total: 890, status: 'OPEN', time: '2 min' },
-  ]);
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
-  const [kitchenAlerts] = useState<KitchenAlert[]>([
-    { id: '1', type: 'delayed', message: 'Order DIN-001 exceeding prep time', tableNumber: 'T-05', time: '2 min ago' },
-    { id: '2', type: 'allergy', message: 'Nut allergy - Table 12', tableNumber: 'T-12', time: '5 min ago' },
-    { id: '3', type: 'rush', message: 'VIP table requesting priority', tableNumber: 'T-01', time: '8 min ago' },
-  ]);
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('vendor-token');
+      const outletId = localStorage.getItem('vendor-outletId');
+
+      if (!token || !outletId) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const response = await fetch(`/api/rms/analytics/dashboard?outletId=${outletId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to fetch dashboard data');
+        return;
+      }
+
+      const data = result.data;
+
+      // Map API data to stats
+      setStats({
+        todayRevenue: data.sales?.totalSales || 0,
+        todayCovers: data.sales?.totalCovers || 0,
+        avgCheck: data.sales?.averageCheck || 0,
+        tableOccupancy: data.tables?.occupancyRate || 0,
+        openOrders: data.activeOrders?.count || 0,
+        kitchenQueue: data.activeOrders?.count || 0,
+        upcomingReservations: data.upcomingReservations?.length || 0,
+        avgPrepTime: 18,
+      });
+
+      setSalesGrowth(data.sales?.salesGrowth || 0);
+
+      // Map recent orders
+      if (data.activeOrders?.orders) {
+        setRecentOrders(
+          data.activeOrders.orders.slice(0, 4).map((order: any) => ({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            tableNumber: order.tableNumber,
+            items: 0,
+            total: order.total,
+            status: order.status,
+            time: `${order.minutesOpen} min`,
+          }))
+        );
+      }
+
+      // Set top items
+      if (data.topItems) {
+        setTopItems(data.topItems);
+      }
+
+      // Set hourly sales
+      if (data.hourlySales) {
+        setHourlySales(data.hourlySales);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      toast.error('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -93,6 +169,16 @@ export default function RMSDashboardPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <RMSLayout title="Dashboard" subtitle="Restaurant overview for today">
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      </RMSLayout>
+    );
+  }
+
   return (
     <RMSLayout title="Dashboard" subtitle="Restaurant overview for today">
       <div className="space-y-6">
@@ -103,9 +189,9 @@ export default function RMSDashboardPage() {
               <div>
                 <p className="text-sm text-gray-500">Today&apos;s Revenue</p>
                 <p className="text-2xl font-bold text-gray-900">₹{stats.todayRevenue.toLocaleString()}</p>
-                <div className="flex items-center gap-1 text-xs text-green-600">
-                  <TrendingUp className="h-3 w-3" />
-                  <span>+12% vs yesterday</span>
+                <div className={`flex items-center gap-1 text-xs ${salesGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {salesGrowth >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  <span>{salesGrowth >= 0 ? '+' : ''}{salesGrowth.toFixed(1)}% vs yesterday</span>
                 </div>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -338,58 +424,50 @@ export default function RMSDashboardPage() {
           <Card>
             <h3 className="font-semibold text-lg mb-4 text-gray-900">Top Selling Items Today</h3>
             <div className="space-y-3">
-              {[
-                { name: 'Butter Chicken', orders: 28, revenue: 8400 },
-                { name: 'Paneer Tikka', orders: 22, revenue: 5500 },
-                { name: 'Chicken Biryani', orders: 18, revenue: 5400 },
-                { name: 'Dal Makhani', orders: 15, revenue: 2250 },
-                { name: 'Garlic Naan', orders: 45, revenue: 2700 },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-sm font-medium text-orange-600">
-                      {i + 1}
-                    </span>
-                    <span className="font-medium text-gray-900">{item.name}</span>
+              {topItems.length > 0 ? (
+                topItems.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-sm font-medium text-orange-600">
+                        {i + 1}
+                      </span>
+                      <span className="font-medium text-gray-900">{item.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-900">₹{item.revenue.toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">{item.quantity} orders</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">₹{item.revenue.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">{item.orders} orders</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No sales data yet</p>
+              )}
             </div>
           </Card>
 
           <Card>
             <h3 className="font-semibold text-lg mb-4 text-gray-900">Hourly Sales</h3>
             <div className="h-48 flex items-end gap-2">
-              {[
-                { hour: '11', value: 2500 },
-                { hour: '12', value: 8500 },
-                { hour: '13', value: 12000 },
-                { hour: '14', value: 6500 },
-                { hour: '15', value: 3200 },
-                { hour: '16', value: 2800 },
-                { hour: '17', value: 4500 },
-                { hour: '18', value: 9500 },
-                { hour: '19', value: 15000 },
-                { hour: '20', value: 18500 },
-                { hour: '21', value: 14000 },
-                { hour: '22', value: 8000 },
-              ].map((item) => {
-                const maxValue = 18500;
-                const height = (item.value / maxValue) * 100;
-                return (
-                  <div key={item.hour} className="flex-1 flex flex-col items-center gap-1">
-                    <div
-                      className="w-full bg-orange-500 rounded-t transition-all hover:bg-orange-600"
-                      style={{ height: `${height}%` }}
-                    />
-                    <span className="text-xs text-gray-500">{item.hour}</span>
-                  </div>
-                );
-              })}
+              {hourlySales.length > 0 ? (
+                hourlySales.map((item) => {
+                  const maxValue = Math.max(...hourlySales.map(s => s.sales));
+                  const height = maxValue > 0 ? (item.sales / maxValue) * 100 : 0;
+                  return (
+                    <div key={item.hour} className="flex-1 flex flex-col items-center gap-1">
+                      <div
+                        className="w-full bg-orange-500 rounded-t transition-all hover:bg-orange-600"
+                        style={{ height: `${height}%`, minHeight: item.sales > 0 ? '4px' : '0' }}
+                        title={`₹${item.sales.toLocaleString()}`}
+                      />
+                      <span className="text-xs text-gray-500">{item.hour.split(':')[0]}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+                  No sales data yet
+                </div>
+              )}
             </div>
             <p className="text-center text-xs text-gray-500 mt-2">Hour of day</p>
           </Card>

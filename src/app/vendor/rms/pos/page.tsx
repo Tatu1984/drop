@@ -20,11 +20,13 @@ import {
   Split,
   ChefHat,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import RMSLayout from '@/components/layout/RMSLayout';
+import toast from 'react-hot-toast';
 
 interface MenuItem {
   id: string;
@@ -55,47 +57,11 @@ interface Table {
   currentOrder?: { id: string; total: number; items: number };
 }
 
-const mockCategories = [
-  { id: '1', name: 'All' },
-  { id: '2', name: 'Starters' },
-  { id: '3', name: 'Main Course' },
-  { id: '4', name: 'Breads' },
-  { id: '5', name: 'Rice & Biryani' },
-  { id: '6', name: 'Desserts' },
-  { id: '7', name: 'Beverages' },
-  { id: '8', name: 'Bar' },
-];
-
-const mockMenuItems: MenuItem[] = [
-  { id: '1', name: 'Paneer Tikka', shortName: 'P.TIKKA', price: 320, category: 'Starters', isVeg: true, isAvailable: true, prepTime: 15 },
-  { id: '2', name: 'Chicken Tikka', shortName: 'CH.TIKKA', price: 380, category: 'Starters', isVeg: false, isAvailable: true, prepTime: 15 },
-  { id: '3', name: 'Veg Spring Roll', shortName: 'V.SPRING', price: 180, category: 'Starters', isVeg: true, isAvailable: true, prepTime: 10 },
-  { id: '4', name: 'Butter Chicken', shortName: 'BUT.CH', price: 420, category: 'Main Course', isVeg: false, isAvailable: true, prepTime: 20 },
-  { id: '5', name: 'Dal Makhani', shortName: 'DAL.M', price: 280, category: 'Main Course', isVeg: true, isAvailable: true, prepTime: 15 },
-  { id: '6', name: 'Paneer Butter Masala', shortName: 'PBM', price: 340, category: 'Main Course', isVeg: true, isAvailable: true, prepTime: 18 },
-  { id: '7', name: 'Chicken Biryani', shortName: 'CH.BIR', price: 380, category: 'Rice & Biryani', isVeg: false, isAvailable: true, prepTime: 25 },
-  { id: '8', name: 'Veg Biryani', shortName: 'V.BIR', price: 320, category: 'Rice & Biryani', isVeg: true, isAvailable: true, prepTime: 25 },
-  { id: '9', name: 'Butter Naan', shortName: 'B.NAAN', price: 60, category: 'Breads', isVeg: true, isAvailable: true, prepTime: 5 },
-  { id: '10', name: 'Garlic Naan', shortName: 'G.NAAN', price: 70, category: 'Breads', isVeg: true, isAvailable: true, prepTime: 5 },
-  { id: '11', name: 'Gulab Jamun', shortName: 'G.JAM', price: 120, category: 'Desserts', isVeg: true, isAvailable: true, prepTime: 5 },
-  { id: '12', name: 'Masala Chai', shortName: 'M.CHAI', price: 60, category: 'Beverages', isVeg: true, isAvailable: true, prepTime: 5 },
-  { id: '13', name: 'Fresh Lime Soda', shortName: 'FLS', price: 80, category: 'Beverages', isVeg: true, isAvailable: true, prepTime: 3 },
-  { id: '14', name: 'Kingfisher Beer', shortName: 'KF.BEER', price: 250, category: 'Bar', isVeg: true, isAvailable: true, prepTime: 2 },
-  { id: '15', name: 'Old Monk Rum', shortName: 'OM.RUM', price: 180, category: 'Bar', isVeg: true, isAvailable: false, prepTime: 2 },
-];
-
-const mockTables: Table[] = [
-  { id: '1', tableNumber: 'T-01', capacity: 2, status: 'AVAILABLE' },
-  { id: '2', tableNumber: 'T-02', capacity: 2, status: 'OCCUPIED', currentOrder: { id: 'o1', total: 850, items: 4 } },
-  { id: '3', tableNumber: 'T-03', capacity: 4, status: 'AVAILABLE' },
-  { id: '4', tableNumber: 'T-04', capacity: 4, status: 'RESERVED' },
-  { id: '5', tableNumber: 'T-05', capacity: 4, status: 'OCCUPIED', currentOrder: { id: 'o2', total: 1250, items: 6 } },
-  { id: '6', tableNumber: 'T-06', capacity: 6, status: 'CLEANING' },
-  { id: '7', tableNumber: 'T-07', capacity: 6, status: 'AVAILABLE' },
-  { id: '8', tableNumber: 'T-08', capacity: 8, status: 'AVAILABLE' },
-];
-
 export default function POSPage() {
+  const [loading, setLoading] = useState(true);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: 'All', name: 'All' }]);
+  const [tables, setTables] = useState<Table[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -104,8 +70,95 @@ export default function POSPage() {
   const [showTableSelector, setShowTableSelector] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const filteredItems = mockMenuItems.filter(item => {
+  useEffect(() => {
+    fetchMenuData();
+    fetchTables();
+  }, []);
+
+  const fetchMenuData = async () => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      // Fetch categories
+      const categoriesResponse = await fetch('/api/rms/menu/categories', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const categoriesResult = await categoriesResponse.json();
+
+      if (categoriesResult.success) {
+        const cats = [
+          { id: 'All', name: 'All' },
+          ...categoriesResult.data.data.map((cat: any) => ({ id: cat.id, name: cat.name }))
+        ];
+        setCategories(cats);
+      }
+
+      // Fetch menu items
+      const itemsResponse = await fetch('/api/rms/menu/items?isActive=true&isAvailable=true', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const itemsResult = await itemsResponse.json();
+
+      if (itemsResult.success) {
+        const items: MenuItem[] = itemsResult.data.data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          shortName: item.shortName || item.name.substring(0, 10),
+          price: item.price,
+          category: item.category?.name || 'Other',
+          isVeg: item.isVeg,
+          isAvailable: item.isAvailable,
+          prepTime: item.prepTime || 15,
+        }));
+        setMenuItems(items);
+      }
+    } catch (error) {
+      console.error('Error fetching menu data:', error);
+      toast.error('Failed to load menu data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTables = async () => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+      const outletId = localStorage.getItem('vendor-outletId');
+
+      if (!token || !outletId) {
+        return;
+      }
+
+      const response = await fetch(`/api/rms/tables?outletId=${outletId}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const tableData: Table[] = result.data.data.map((table: any) => ({
+          id: table.id,
+          tableNumber: table.tableNumber,
+          capacity: table.capacity,
+          status: table.status,
+        }));
+        setTables(tableData);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+    }
+  };
+
+  const filteredItems = menuItems.filter(item => {
     const matchesCategory = selectedCategory === 'All' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.shortName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -152,6 +205,71 @@ export default function POSPage() {
   const serviceCharge = Math.round(subtotal * 0.10);
   const total = subtotal + tax + serviceCharge;
 
+  const createOrder = async () => {
+    if (!selectedTable || orderItems.length === 0) {
+      toast.error('Please select a table and add items');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('vendor-token');
+      const outletId = localStorage.getItem('vendor-outletId');
+      const employeeId = localStorage.getItem('vendor-employeeId');
+
+      if (!token || !outletId || !employeeId) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      const orderData = {
+        outletId,
+        tableId: selectedTable.id,
+        createdByEmployeeId: employeeId,
+        guestCount,
+        orderType: selectedTable.tableNumber === 'TAKEAWAY' ? 'TAKEAWAY' : 'DINE_IN',
+        items: orderItems.map(item => ({
+          menuItemId: item.menuItem.id,
+          name: item.menuItem.name,
+          quantity: item.quantity,
+          unitPrice: item.menuItem.price,
+          modifiers: item.modifiers.length > 0 ? JSON.stringify(item.modifiers) : null,
+          specialInstructions: item.notes || null,
+        })),
+      };
+
+      const response = await fetch('/api/rms/orders', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        toast.error(result.error || 'Failed to create order');
+        return;
+      }
+
+      toast.success('Order created successfully!');
+
+      // Reset form
+      setOrderItems([]);
+      setSelectedTable(null);
+      setShowTableSelector(true);
+      setGuestCount(2);
+      setShowPaymentModal(false);
+    } catch (error) {
+      console.error('Error creating order:', error);
+      toast.error('Failed to create order');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getStatusColor = (status: Table['status']) => {
     switch (status) {
       case 'AVAILABLE': return 'bg-green-100 border-green-500 text-green-700';
@@ -162,6 +280,16 @@ export default function POSPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <RMSLayout title="POS" subtitle="Loading..." fullWidth>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      </RMSLayout>
+    );
+  }
+
   if (showTableSelector && !selectedTable) {
     return (
       <RMSLayout title="POS - Select Table" subtitle="Choose a table to start taking order" fullWidth>
@@ -170,7 +298,7 @@ export default function POSPage() {
           <div className="mb-6">
             <h3 className="font-semibold text-lg mb-4 text-gray-900">Select Table</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {mockTables.map((table) => (
+              {tables.map((table) => (
                 <button
                   key={table.id}
                   onClick={() => {
@@ -202,19 +330,19 @@ export default function POSPage() {
           {/* Quick Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-green-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-700">{mockTables.filter(t => t.status === 'AVAILABLE').length}</p>
+              <p className="text-2xl font-bold text-green-700">{tables.filter(t => t.status === 'AVAILABLE').length}</p>
               <p className="text-sm text-green-600">Available</p>
             </div>
             <div className="bg-red-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-red-700">{mockTables.filter(t => t.status === 'OCCUPIED').length}</p>
+              <p className="text-2xl font-bold text-red-700">{tables.filter(t => t.status === 'OCCUPIED').length}</p>
               <p className="text-sm text-red-600">Occupied</p>
             </div>
             <div className="bg-purple-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-700">{mockTables.filter(t => t.status === 'RESERVED').length}</p>
+              <p className="text-2xl font-bold text-purple-700">{tables.filter(t => t.status === 'RESERVED').length}</p>
               <p className="text-sm text-purple-600">Reserved</p>
             </div>
             <div className="bg-yellow-50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-yellow-700">{mockTables.filter(t => t.status === 'CLEANING').length}</p>
+              <p className="text-2xl font-bold text-yellow-700">{tables.filter(t => t.status === 'CLEANING').length}</p>
               <p className="text-sm text-yellow-600">Cleaning</p>
             </div>
           </div>
@@ -274,7 +402,7 @@ export default function POSPage() {
               />
             </div>
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {mockCategories.map((cat) => (
+              {categories.map((cat) => (
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.name)}
@@ -448,15 +576,26 @@ export default function POSPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" disabled={orderItems.length === 0}>
+              <Button
+                variant="outline"
+                disabled={orderItems.length === 0 || submitting}
+                onClick={createOrder}
+              >
                 <Printer className="h-4 w-4 mr-1" />
-                Print KOT
+                {submitting ? 'Creating...' : 'Print KOT'}
               </Button>
               <Button
-                onClick={() => setShowPaymentModal(true)}
-                disabled={orderItems.length === 0}
+                onClick={createOrder}
+                disabled={orderItems.length === 0 || submitting}
               >
-                Pay ₹{total.toLocaleString()}
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>Place Order ₹{total.toLocaleString()}</>
+                )}
               </Button>
             </div>
           </div>

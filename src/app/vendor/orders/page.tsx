@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Package,
   Search,
@@ -15,10 +15,12 @@ import {
   Printer,
   Eye,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import VendorLayout from '@/components/layout/VendorLayout';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import toast from 'react-hot-toast';
 
 interface OrderItem {
   name: string;
@@ -151,10 +153,76 @@ const mockOrders: Order[] = [
 ];
 
 export default function VendorOrdersPage() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [statusFilter]);
+
+  const fetchOrders = async () => {
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('vendor-token');
+      if (!token) {
+        toast.error('Please login to continue');
+        return;
+      }
+
+      const params = new URLSearchParams();
+      if (statusFilter !== 'ALL') {
+        params.append('status', statusFilter);
+      }
+
+      const response = await fetch(`/api/vendor/orders?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      const data = await response.json();
+      if (data.success && data.data.items) {
+        // Transform the data to match the UI format
+        const transformedOrders = data.data.items.map((order: any) => ({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          type: order.type || 'DELIVERY',
+          customer: {
+            name: order.user?.name || 'Unknown',
+            phone: order.user?.phone || '',
+            address: order.address?.fullAddress || order.address?.street || '',
+          },
+          items: order.items?.map((item: any) => ({
+            name: item.product?.name || 'Item',
+            quantity: item.quantity,
+            price: item.price,
+          })) || [],
+          subtotal: order.subtotal,
+          deliveryFee: order.deliveryFee || 0,
+          discount: order.discount || 0,
+          total: order.total,
+          paymentMethod: order.paymentMethod || 'Online',
+          paymentStatus: order.paymentStatus || 'PAID',
+          createdAt: new Date(order.createdAt),
+          rider: order.rider ? {
+            name: order.rider.name,
+            phone: order.rider.phone,
+          } : undefined,
+          notes: order.notes,
+        }));
+        setOrders(transformedOrders);
+      } else {
+        toast.error(data.error || 'Failed to load orders');
+      }
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
@@ -188,18 +256,44 @@ export default function VendorOrdersPage() {
     return `${hours}h ${minutes % 60}m ago`;
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: Order['status']) => {
-    setOrders(orders.map(order =>
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
+  const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      const token = localStorage.getItem('vendor-token');
+      const response = await fetch('/api/vendor/orders', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Order status updated to ${newStatus.replace('_', ' ')}`);
+        fetchOrders(); // Refresh orders
+      } else {
+        toast.error(data.error || 'Failed to update order');
+      }
+    } catch (error) {
+      console.error('Failed to update order:', error);
+      toast.error('Failed to update order status');
     }
   };
 
   const newOrders = orders.filter(o => o.status === 'NEW').length;
   const preparingOrders = orders.filter(o => o.status === 'PREPARING').length;
   const readyOrders = orders.filter(o => o.status === 'READY').length;
+
+  if (isLoading) {
+    return (
+      <VendorLayout title="Orders">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        </div>
+      </VendorLayout>
+    );
+  }
 
   return (
     <VendorLayout title="Orders">
@@ -274,7 +368,7 @@ export default function VendorOrdersPage() {
                     <option value="PICKED_UP">Picked Up</option>
                     <option value="DELIVERED">Delivered</option>
                   </select>
-                  <Button variant="outline" className="flex items-center gap-2">
+                  <Button variant="outline" className="flex items-center gap-2" onClick={fetchOrders}>
                     <RefreshCw className="h-4 w-4" />
                     Refresh
                   </Button>

@@ -3,21 +3,74 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronRight, Sparkles, PartyPopper, Package } from 'lucide-react';
-import {
-  mainCategories,
-  restaurants,
-  trendingProducts,
-  banners,
-} from '@/data/mockData';
+import { ChevronRight, Sparkles, PartyPopper, Package, Loader2 } from 'lucide-react';
+import { mainCategories, banners } from '@/data/mockData';
 import VendorCard from '@/components/cards/VendorCard';
 import ProductCard from '@/components/cards/ProductCard';
 import CategoryCard from '@/components/cards/CategoryCard';
 import Card from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 
+interface Vendor {
+  id: string;
+  name: string;
+  description?: string;
+  logo?: string;
+  coverImage?: string;
+  type: string;
+  rating: number;
+  totalRatings: number;
+  address: string;
+  avgDeliveryTime: number;
+  minimumOrder: number;
+  isVerified: boolean;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  images: string[];
+  price: number;
+  discountPrice?: number;
+  rating: number;
+  isVeg: boolean;
+  vendor?: { id: string; name: string };
+}
+
 export default function HomePage() {
   const [currentBanner, setCurrentBanner] = useState(0);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch vendors and products
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [vendorsRes, productsRes] = await Promise.all([
+          fetch('/api/vendors?limit=10&sortBy=rating'),
+          fetch('/api/products?limit=8&sortBy=rating'),
+        ]);
+
+        if (vendorsRes.ok) {
+          const vendorData = await vendorsRes.json();
+          setVendors(vendorData.data?.data || []);
+        }
+
+        if (productsRes.ok) {
+          const productData = await productsRes.json();
+          setProducts(productData.data?.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching home data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Auto-rotate banners
   useEffect(() => {
@@ -120,11 +173,19 @@ export default function HomePage() {
             See all <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="space-y-3">
-          {restaurants.slice(0, 3).map((vendor) => (
-            <VendorCard key={vendor.id} vendor={vendor} />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+          </div>
+        ) : vendors.length > 0 ? (
+          <div className="space-y-3">
+            {vendors.slice(0, 3).map((vendor) => (
+              <VendorCard key={vendor.id} vendor={vendor} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-4">No restaurants available</p>
+        )}
       </section>
 
       {/* AI Recommendations */}
@@ -133,15 +194,23 @@ export default function HomePage() {
           <Sparkles className="h-5 w-5 text-orange-500" />
           <h2 className="text-lg font-semibold text-gray-900">Recommended for You</h2>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {trendingProducts.slice(0, 4).map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              variant="compact"
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+          </div>
+        ) : products.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
+            {products.slice(0, 4).map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                variant="compact"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-4">No recommendations yet</p>
+        )}
       </section>
 
       {/* Subscription Banner */}
@@ -175,15 +244,23 @@ export default function HomePage() {
             See all <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="space-y-3">
-          {restaurants.map((vendor) => (
-            <VendorCard
-              key={vendor.id}
-              vendor={vendor}
-              variant="horizontal"
-            />
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+          </div>
+        ) : vendors.length > 0 ? (
+          <div className="space-y-3">
+            {vendors.map((vendor) => (
+              <VendorCard
+                key={vendor.id}
+                vendor={vendor}
+                variant="horizontal"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 text-center py-4">No restaurants found</p>
+        )}
       </section>
     </div>
   );
